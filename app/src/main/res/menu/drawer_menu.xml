@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_all_notes"
+            android:icon="@android:drawable/ic_menu_agenda"
+            android:title="@string/all_notes" />
+        <item
+            android:id="@+id/nav_favorites"
+            android:icon="@android:drawable/btn_star"
+            android:title="@string/favorites" />
+        <item
+            android:id="@+id/nav_trash"
+            android:icon="@android:drawable/ic_menu_delete"
+            android:title="@string/trash" />
+    </group>
+    <item android:title="@string/other">
+        <menu>
+            <item
+                android:id="@+id/nav_settings"
+                android:icon="@android:drawable/ic_menu_manage"
+                android:title="@string/settings" />
+            <item
+                android:id="@+id/nav_about"
+                android:icon="@android:drawable/ic_menu_info_details"
+                android:title="@string/about" />
+        </menu>
+    </item>
+</menu>

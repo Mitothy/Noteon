@@ -37,9 +37,13 @@ object DataHandler {
         return notes.toList()
     }
 
-    fun getNoteById(id: Long): Note? {
-        return notes.find { it.id == id }
+    fun addNote(title: String, content: String): Note {
+        val newNote = Note(++lastId, title, content)
+        notes.add(newNote)
+        return newNote
     }
 
     fun getAllNotes(): List<Note> = notes.toList()
+
+    fun getNoteById(id: Long): Note? = notes.find { it.id == id }
 }

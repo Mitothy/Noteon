@@ -6,6 +6,10 @@
             android:icon="@android:drawable/ic_menu_agenda"
             android:title="@string/all_notes" />
         <item
+            android:id="@+id/nav_folders"
+            android:icon="@android:drawable/ic_menu_mylocation"
+            android:title="@string/folders" />
+        <item
             android:id="@+id/nav_favorites"
             android:icon="@android:drawable/btn_star"
             android:title="@string/favorites" />

@@ -1,9 +1,12 @@
-import com.example.noteon.Note
+package com.example.noteon
+
 import kotlin.random.Random
 
 object DataHandler {
     private val notes = mutableListOf<Note>()
-    private var lastId = 0L
+    private val folders = mutableListOf<Folder>()
+    private var lastNoteId = 0L
+    private var lastFolderId = 0L
 
     private val dummyTitles = listOf(
         "Grocery List", "Meeting Notes", "Book Ideas", "Travel Plans",
@@ -26,19 +29,49 @@ object DataHandler {
         "Math: pg 45-47, Science: lab report, English: essay outline"
     )
 
+    fun createFolder(name: String, description: String): Folder {
+        val folder = Folder(++lastFolderId, name, description)
+        folders.add(folder)
+        return folder
+    }
+
+    fun searchFolders(query: String): List<Folder> {
+        return folders.filter { folder ->
+            folder.name.contains(query, ignoreCase = true) ||
+                    folder.description.contains(query, ignoreCase = true)
+        }
+    }
+
+    fun getAllFolders(): List<Folder> = folders.toList()
+
+    fun getFolderById(id: Long): Folder? = folders.find { it.id == id }
+
+    fun deleteFolder(id: Long) {
+        folders.removeIf { it.id == id }
+        // Move notes from deleted folder to root
+        notes.filter { it.folderId == id }.forEach { it.folderId = 0 }
+    }
+
+    fun getNotesInFolder(folderId: Long): List<Note> =
+        notes.filter { it.folderId == folderId }.sortedByDescending { it.timestamp }
+
+    fun moveNoteToFolder(noteId: Long, folderId: Long) {
+        notes.find { it.id == noteId }?.let { it.folderId = folderId }
+    }
+
     fun generateDummyNotes(count: Int): List<Note> {
         notes.clear()
         repeat(count) {
             val title = dummyTitles[Random.nextInt(dummyTitles.size)]
             val content = dummyContents[Random.nextInt(dummyContents.size)]
             val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000) // Random time within last 30 days
-            notes.add(Note(id = ++lastId, title = title, content = content, timestamp = timestamp))
+            notes.add(Note(id = ++lastNoteId, title = title, content = content, timestamp = timestamp))
         }
         return notes.toList()
     }
 
-    fun addNote(title: String, content: String): Note {
-        val newNote = Note(++lastId, title, content)
+    fun addNote(title: String, content: String, folderId: Long = 0): Note {
+        val newNote = Note(++lastNoteId, title, content, folderId)
         notes.add(newNote)
         return newNote
     }

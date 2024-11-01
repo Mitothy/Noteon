@@ -26,6 +26,10 @@
         <activity
             android:name=".AddNoteActivity"
             android:exported="false" />
+        <activity
+            android:name=".FolderActivity"
+            android:exported="false"
+            android:label="@string/folders" />
     </application>
 
 </manifest>

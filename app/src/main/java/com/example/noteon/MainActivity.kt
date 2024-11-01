@@ -1,5 +1,6 @@
 package com.example.noteon
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
@@ -22,6 +23,16 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private lateinit var searchView: SearchView
     private lateinit var notesAdapter: NotesAdapter
     private lateinit var notes: List<Note>
+
+    companion object {
+        private const val EXTRA_FOLDER_ID = "folder_id"
+
+        fun createIntent(context: Context, folderId: Long): Intent {
+            return Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_FOLDER_ID, folderId)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,15 +60,29 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         // Generate dummy notes
         notes = DataHandler.generateDummyNotes(20) // Generate 20 dummy notes
 
+        val folderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
+        notes = if (folderId == 0L) {
+            DataHandler.getAllNotes()
+        } else {
+            DataHandler.getNotesInFolder(folderId)
+        }
+
         setupRecyclerView()
         setupFab()
         setupSearchView()
     }
 
     private fun setupRecyclerView() {
-        notesAdapter = NotesAdapter(notes) { note ->
-            openNoteDetail(note.id)
-        }
+        notesAdapter = NotesAdapter(
+            notes = notes,
+            onNoteClick = { note -> openNoteDetail(note.id) },
+            onMoveNote = { note ->
+                MoveNoteDialog(this).show(note.id) { newFolderId ->
+                    // Refresh the list after moving
+                    updateNotesList()
+                }
+            }
+        )
         recyclerViewNotes.layoutManager = LinearLayoutManager(this)
         recyclerViewNotes.adapter = notesAdapter
     }
@@ -104,6 +129,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         when (item.itemId) {
             R.id.nav_all_notes -> {
                 // Handle all notes action
+            }
+            R.id.nav_folders -> {
+                startActivity(Intent(this, FolderActivity::class.java))
             }
             R.id.nav_favorites -> {
                 // Handle favorites action

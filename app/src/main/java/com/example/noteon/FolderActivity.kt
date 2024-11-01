@@ -1,19 +1,24 @@
 package com.example.noteon
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.widget.EditText
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.navigation.NavigationView
 
-class FolderActivity : AppCompatActivity() {
+class FolderActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
+    private lateinit var navigationView: NavigationView
     private lateinit var recyclerViewFolders: RecyclerView
     private lateinit var fabAddFolder: FloatingActionButton
     private lateinit var folderAdapter: FolderAdapter
@@ -30,6 +35,27 @@ class FolderActivity : AppCompatActivity() {
         setupRecyclerView()
         setupFab()
         setupSearchView()
+
+        navigationView = findViewById(R.id.navigationView)
+        navigationView.setNavigationItemSelectedListener(this)
+        navigationView.setCheckedItem(R.id.nav_folders)
+    }
+
+    override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.nav_all_notes -> {
+                val intent = MainActivity.createIntent(this, 0)
+                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(intent)
+                finish()
+            }
+            R.id.nav_folders -> {
+                drawerLayout.closeDrawer(GravityCompat.START)
+                return true
+            }
+        }
+        drawerLayout.closeDrawer(GravityCompat.START)
+        return true
     }
 
     private fun setupViews() {
@@ -41,10 +67,19 @@ class FolderActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        folderAdapter = FolderAdapter(DataHandler.getAllFolders()) { folder ->
-            // Navigate to MainActivity with folder filter
-            startActivity(MainActivity.createIntent(this, folder.id))
-        }
+        folderAdapter = FolderAdapter(
+            folders = DataHandler.getAllFolders(),
+            onFolderClick = { folder ->
+                val intent = MainActivity.createIntent(this, folder.id)
+                startActivity(intent)
+                finish() // Close the folders activity when a folder is selected
+            },
+            onFolderOptions = { folder ->
+                FolderOptionsDialog(this).show(folder) {
+                    folderAdapter.updateFolders(DataHandler.getAllFolders())
+                }
+            }
+        )
         recyclerViewFolders.layoutManager = LinearLayoutManager(this)
         recyclerViewFolders.adapter = folderAdapter
     }

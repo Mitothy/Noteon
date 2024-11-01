@@ -19,10 +19,12 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var recyclerViewNotes: RecyclerView
+    private lateinit var navigationView: NavigationView
     private lateinit var fabAddNote: FloatingActionButton
     private lateinit var searchView: SearchView
     private lateinit var notesAdapter: NotesAdapter
     private lateinit var notes: List<Note>
+    private var currentFolderId: Long = 0
 
     companion object {
         private const val EXTRA_FOLDER_ID = "folder_id"
@@ -30,6 +32,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         fun createIntent(context: Context, folderId: Long): Intent {
             return Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_FOLDER_ID, folderId)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
         }
     }
@@ -42,7 +45,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setSupportActionBar(toolbar)
 
         drawerLayout = findViewById(R.id.drawerLayout)
-        val navigationView: NavigationView = findViewById(R.id.navigationView)
         recyclerViewNotes = findViewById(R.id.recyclerViewNotes)
         fabAddNote = findViewById(R.id.fabAddNote)
         searchView = findViewById(R.id.searchView)
@@ -55,6 +57,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
 
+        navigationView = findViewById(R.id.navigationView)
         navigationView.setNavigationItemSelectedListener(this)
 
         // Generate dummy notes
@@ -70,6 +73,19 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setupRecyclerView()
         setupFab()
         setupSearchView()
+
+        currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
+        updateNotesList()
+        updateTitle()
+        updateNavigationSelection()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
+        updateNotesList()
+        updateTitle()
+        updateNavigationSelection()
     }
 
     private fun setupRecyclerView() {
@@ -77,9 +93,15 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             notes = notes,
             onNoteClick = { note -> openNoteDetail(note.id) },
             onMoveNote = { note ->
-                MoveNoteDialog(this).show(note.id) { newFolderId ->
-                    // Refresh the list after moving
-                    updateNotesList()
+                MoveNoteDialog(this).show(
+                    noteId = note.id,
+                    currentFolderId = currentFolderId
+                ) { newFolderId ->
+                    if (currentFolderId != 0L && newFolderId == 0L) {
+                        updateNotesList()
+                    } else {
+                        updateNotesList()
+                    }
                 }
             }
         )
@@ -90,6 +112,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun setupFab() {
         fabAddNote.setOnClickListener {
             val intent = Intent(this, AddNoteActivity::class.java)
+            intent.putExtra("folder_id", currentFolderId) // Pass current folder ID
             startActivity(intent)
         }
     }
@@ -128,7 +151,12 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.nav_all_notes -> {
-                // Handle all notes action
+                if (currentFolderId != 0L) {
+                    currentFolderId = 0
+                    updateNotesList()
+                    updateTitle()
+                    updateNavigationSelection()
+                }
             }
             R.id.nav_folders -> {
                 startActivity(Intent(this, FolderActivity::class.java))
@@ -163,8 +191,28 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         updateNotesList()
     }
 
+    private fun updateNavigationSelection() {
+        navigationView.setCheckedItem(
+            if (currentFolderId == 0L) R.id.nav_all_notes
+            else R.id.nav_folders
+        )
+    }
+
     private fun updateNotesList() {
-        notes = DataHandler.getAllNotes()
+        notes = if (currentFolderId == 0L) {
+            DataHandler.getAllNotes()
+        } else {
+            DataHandler.getNotesInFolder(currentFolderId)
+        }
         notesAdapter.updateNotes(notes)
+    }
+
+    private fun updateTitle() {
+        if (currentFolderId == 0L) {
+            supportActionBar?.title = getString(R.string.all_notes)
+        } else {
+            val folder = DataHandler.getFolderById(currentFolderId)
+            supportActionBar?.title = folder?.name ?: getString(R.string.all_notes)
+        }
     }
 }

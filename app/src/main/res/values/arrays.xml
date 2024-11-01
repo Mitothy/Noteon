@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="folder_options">
+        <item>Edit folder</item>
+        <item>Delete folder</item>
+    </string-array>
+</resources>

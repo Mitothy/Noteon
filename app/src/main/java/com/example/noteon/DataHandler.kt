@@ -46,17 +46,26 @@ object DataHandler {
 
     fun getFolderById(id: Long): Folder? = folders.find { it.id == id }
 
-    fun deleteFolder(id: Long) {
-        folders.removeIf { it.id == id }
-        // Move notes from deleted folder to root
-        notes.filter { it.folderId == id }.forEach { it.folderId = 0 }
+    fun updateFolder(folderId: Long, newName: String, newDescription: String) {
+        folders.find { it.id == folderId }?.let {
+            it.name = newName
+            it.description = newDescription
+        }
+    }
+
+    fun deleteFolder(folderId: Long) {
+        folders.removeIf { it.id == folderId }
+        // Move notes in deleted folder to root (no folder)
+        notes.filter { it.folderId == folderId }.forEach { it.folderId = 0 }
     }
 
     fun getNotesInFolder(folderId: Long): List<Note> =
         notes.filter { it.folderId == folderId }.sortedByDescending { it.timestamp }
 
     fun moveNoteToFolder(noteId: Long, folderId: Long) {
-        notes.find { it.id == noteId }?.let { it.folderId = folderId }
+        notes.find { it.id == noteId }?.apply {
+            this.folderId = folderId
+        }
     }
 
     fun generateDummyNotes(count: Int): List<Note> {

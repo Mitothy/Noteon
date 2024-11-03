@@ -49,6 +49,13 @@ class FolderActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelec
                 startActivity(intent)
                 finish()
             }
+            R.id.nav_favorites -> {
+                val intent = MainActivity.createIntent(this, 0)
+                intent.putExtra("view_type", MainActivity.ViewType.FAVORITES.name)
+                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(intent)
+                finish()
+            }
             R.id.nav_folders -> {
                 drawerLayout.closeDrawer(GravityCompat.START)
                 return true

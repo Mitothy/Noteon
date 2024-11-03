@@ -73,8 +73,15 @@ object DataHandler {
         repeat(count) {
             val title = dummyTitles[Random.nextInt(dummyTitles.size)]
             val content = dummyContents[Random.nextInt(dummyContents.size)]
-            val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000) // Random time within last 30 days
-            notes.add(Note(id = ++lastNoteId, title = title, content = content, timestamp = timestamp))
+            val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000)
+            val isFavorite = Random.nextBoolean() // Randomly set some notes as favorites
+            notes.add(Note(
+                id = ++lastNoteId,
+                title = title,
+                content = content,
+                timestamp = timestamp,
+                isFavorite = isFavorite
+            ))
         }
         return notes.toList()
     }
@@ -88,4 +95,13 @@ object DataHandler {
     fun getAllNotes(): List<Note> = notes.toList()
 
     fun getNoteById(id: Long): Note? = notes.find { it.id == id }
+
+    fun toggleNoteFavorite(noteId: Long) {
+        notes.find { it.id == noteId }?.let { note ->
+            note.isFavorite = !note.isFavorite
+        }
+    }
+
+    fun getFavoriteNotes(): List<Note> =
+        notes.filter { it.isFavorite }.sortedByDescending { it.timestamp }
 }

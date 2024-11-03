@@ -25,9 +25,17 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private lateinit var notesAdapter: NotesAdapter
     private lateinit var notes: List<Note>
     private var currentFolderId: Long = 0
+    private var currentView = ViewType.ALL_NOTES
+
+    enum class ViewType {
+        ALL_NOTES,
+        FAVORITES,
+        FOLDER
+    }
 
     companion object {
         private const val EXTRA_FOLDER_ID = "folder_id"
+        private const val EXTRA_VIEW_TYPE = "view_type"
 
         fun createIntent(context: Context, folderId: Long): Intent {
             return Intent(context, MainActivity::class.java).apply {
@@ -60,9 +68,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         navigationView = findViewById(R.id.navigationView)
         navigationView.setNavigationItemSelectedListener(this)
 
-        // Generate dummy notes
-        notes = DataHandler.generateDummyNotes(20) // Generate 20 dummy notes
-
+        notes = DataHandler.generateDummyNotes(20)
         val folderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
         notes = if (folderId == 0L) {
             DataHandler.getAllNotes()
@@ -75,6 +81,16 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setupSearchView()
 
         currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
+        intent.getStringExtra(EXTRA_VIEW_TYPE)?.let { viewTypeName ->
+            currentView = try {
+                ViewType.valueOf(viewTypeName)
+            } catch (e: IllegalArgumentException) {
+                if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
+            }
+        } ?: run {
+            currentView = if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
+        }
+
         updateNotesList()
         updateTitle()
         updateNavigationSelection()
@@ -82,7 +98,17 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
+        intent.getStringExtra(EXTRA_VIEW_TYPE)?.let { viewTypeName ->
+            currentView = try {
+                ViewType.valueOf(viewTypeName)
+            } catch (e: IllegalArgumentException) {
+                if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
+            }
+        } ?: run {
+            currentView = if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
+        }
         updateNotesList()
         updateTitle()
         updateNavigationSelection()
@@ -92,15 +118,19 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         notesAdapter = NotesAdapter(
             notes = notes,
             onNoteClick = { note -> openNoteDetail(note.id) },
-            onMoveNote = { note ->
+            onNoteOptions = { note ->
                 MoveNoteDialog(this).show(
                     noteId = note.id,
                     currentFolderId = currentFolderId
                 ) { newFolderId ->
-                    if (currentFolderId != 0L && newFolderId == 0L) {
+                    if (currentView == ViewType.FAVORITES && !note.isFavorite) {
+                        // If we're in favorites view and note was unfavorited, refresh list
+                        updateNotesList()
+                    } else if (currentFolderId != 0L && newFolderId != currentFolderId) {
+                        // If we're in a folder view and note was moved, refresh list
                         updateNotesList()
                     } else {
-                        updateNotesList()
+                        notesAdapter.updateNotes(notes)
                     }
                 }
             }
@@ -112,7 +142,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun setupFab() {
         fabAddNote.setOnClickListener {
             val intent = Intent(this, AddNoteActivity::class.java)
-            intent.putExtra("folder_id", currentFolderId) // Pass current folder ID
+            intent.putExtra("folder_id", currentFolderId)
             startActivity(intent)
         }
     }
@@ -151,18 +181,15 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.nav_all_notes -> {
-                if (currentFolderId != 0L) {
-                    currentFolderId = 0
-                    updateNotesList()
-                    updateTitle()
-                    updateNavigationSelection()
-                }
+                currentView = ViewType.ALL_NOTES
+                currentFolderId = 0
             }
             R.id.nav_folders -> {
                 startActivity(Intent(this, FolderActivity::class.java))
             }
             R.id.nav_favorites -> {
-                // Handle favorites action
+                currentView = ViewType.FAVORITES
+                currentFolderId = 0
             }
             R.id.nav_trash -> {
                 // Handle trash action
@@ -174,10 +201,14 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 // Handle about action
             }
         }
+        updateNotesList()
+        updateTitle()
+        updateNavigationSelection()
         drawerLayout.closeDrawer(GravityCompat.START)
         return true
     }
 
+    @Deprecated("This method has been deprecated in favor of using the\n      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.\n      The OnBackPressedDispatcher controls how back button events are dispatched\n      to one or more {@link OnBackPressedCallback} objects.")
     override fun onBackPressed() {
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START)
@@ -192,27 +223,30 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     }
 
     private fun updateNavigationSelection() {
-        navigationView.setCheckedItem(
-            if (currentFolderId == 0L) R.id.nav_all_notes
-            else R.id.nav_folders
-        )
+        // Select the appropriate navigation item based on current view
+        val menuItemId = when (currentView) {
+            ViewType.ALL_NOTES -> R.id.nav_all_notes
+            ViewType.FAVORITES -> R.id.nav_favorites
+            ViewType.FOLDER -> R.id.nav_folders
+        }
+        navigationView.setCheckedItem(menuItemId)
     }
 
     private fun updateNotesList() {
-        notes = if (currentFolderId == 0L) {
-            DataHandler.getAllNotes()
-        } else {
-            DataHandler.getNotesInFolder(currentFolderId)
+        notes = when (currentView) {
+            ViewType.ALL_NOTES -> DataHandler.getAllNotes()
+            ViewType.FAVORITES -> DataHandler.getFavoriteNotes()
+            ViewType.FOLDER -> DataHandler.getNotesInFolder(currentFolderId)
         }
         notesAdapter.updateNotes(notes)
     }
 
     private fun updateTitle() {
-        if (currentFolderId == 0L) {
-            supportActionBar?.title = getString(R.string.all_notes)
-        } else {
-            val folder = DataHandler.getFolderById(currentFolderId)
-            supportActionBar?.title = folder?.name ?: getString(R.string.all_notes)
+        supportActionBar?.title = when (currentView) {
+            ViewType.ALL_NOTES -> getString(R.string.all_notes)
+            ViewType.FAVORITES -> getString(R.string.favorites)
+            ViewType.FOLDER -> DataHandler.getFolderById(currentFolderId)?.name
+                ?: getString(R.string.all_notes)
         }
     }
 }

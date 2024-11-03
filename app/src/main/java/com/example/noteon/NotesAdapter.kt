@@ -5,12 +5,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
+import androidx.core.text.buildSpannedString
 import androidx.recyclerview.widget.RecyclerView
 
 class NotesAdapter(
     private var notes: List<Note>,
     private val onNoteClick: (Note) -> Unit,
-    private val onMoveNote: (Note) -> Unit
+    private val onNoteOptions: (Note) -> Unit
 ) : RecyclerView.Adapter<NotesAdapter.NoteViewHolder>() {
 
     inner class NoteViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -21,11 +22,16 @@ class NotesAdapter(
         fun bind(note: Note) {
             textViewTitle.text = note.title
             textViewContent.text = note.content
-            itemView.setOnClickListener { onNoteClick(note) }
 
-            buttonOptions.setOnClickListener {
-                onMoveNote(note)
+            textViewTitle.text = buildSpannedString {
+                append(note.title)
+                if (note.isFavorite) {
+                    append(" ★")
+                }
             }
+
+            itemView.setOnClickListener { onNoteClick(note) }
+            buttonOptions.setOnClickListener { onNoteOptions(note) }
         }
     }
 

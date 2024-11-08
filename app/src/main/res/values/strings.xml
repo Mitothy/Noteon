@@ -46,4 +46,9 @@
     <string name="delete_permanently">Delete Permanently</string>
     <string name="delete_permanently_message">This note will be permanently deleted. This action cannot be undone.</string>
     <string name="move_to_trash">Move to Trash</string>
+    <string name="title_required">Title is required</string>
+    <string name="note_updated">Note updated</string>
+    <string name="discard_changes">Discard Changes?</string>
+    <string name="discard_changes_message">You have unsaved changes. Are you sure you want to discard them?</string>
+    <string name="discard">Discard</string>
 </resources>

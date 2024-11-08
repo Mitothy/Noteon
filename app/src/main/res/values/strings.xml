@@ -37,4 +37,13 @@
     <string name="add_to_favorites">Add to favorites</string>
     <string name="remove_from_favorites">Remove from favorites</string>
     <string name="move_to">Move to…</string>
+    <string name="empty_trash">Empty Trash</string>
+    <string name="empty_trash_message">Are you sure you want to permanently delete all items in the trash?</string>
+    <string name="no_items_in_trash">No items in trash</string>
+    <string name="restore_note">Restore Note</string>
+    <string name="restore_note_message">Do you want to restore this note?</string>
+    <string name="restore">Restore</string>
+    <string name="delete_permanently">Delete Permanently</string>
+    <string name="delete_permanently_message">This note will be permanently deleted. This action cannot be undone.</string>
+    <string name="move_to_trash">Move to Trash</string>
 </resources>

@@ -59,31 +59,10 @@ object DataHandler {
         notes.filter { it.folderId == folderId }.forEach { it.folderId = 0 }
     }
 
-    fun getNotesInFolder(folderId: Long): List<Note> =
-        notes.filter { it.folderId == folderId }.sortedByDescending { it.timestamp }
-
     fun moveNoteToFolder(noteId: Long, folderId: Long) {
         notes.find { it.id == noteId }?.apply {
             this.folderId = folderId
         }
-    }
-
-    fun generateDummyNotes(count: Int): List<Note> {
-        notes.clear()
-        repeat(count) {
-            val title = dummyTitles[Random.nextInt(dummyTitles.size)]
-            val content = dummyContents[Random.nextInt(dummyContents.size)]
-            val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000)
-            val isFavorite = Random.nextBoolean() // Randomly set some notes as favorites
-            notes.add(Note(
-                id = ++lastNoteId,
-                title = title,
-                content = content,
-                timestamp = timestamp,
-                isFavorite = isFavorite
-            ))
-        }
-        return notes.toList()
     }
 
     fun addNote(title: String, content: String, folderId: Long = 0): Note {
@@ -92,9 +71,16 @@ object DataHandler {
         return newNote
     }
 
-    fun getAllNotes(): List<Note> = notes.toList()
+    fun getAllNotes(): List<Note> = notes.filter { !it.isDeleted }.sortedByDescending { it.timestamp }
 
     fun getNoteById(id: Long): Note? = notes.find { it.id == id }
+
+    fun updateNote(updatedNote: Note) {
+        val index = notes.indexOfFirst { it.id == updatedNote.id }
+        if (index != -1) {
+            notes[index] = updatedNote
+        }
+    }
 
     fun toggleNoteFavorite(noteId: Long) {
         notes.find { it.id == noteId }?.let { note ->
@@ -103,5 +89,58 @@ object DataHandler {
     }
 
     fun getFavoriteNotes(): List<Note> =
-        notes.filter { it.isFavorite }.sortedByDescending { it.timestamp }
+        notes.filter { it.isFavorite && !it.isDeleted }.sortedByDescending { it.timestamp }
+
+    fun getNotesInFolder(folderId: Long): List<Note> =
+        notes.filter { it.folderId == folderId && !it.isDeleted }.sortedByDescending { it.timestamp }
+
+    fun moveNoteToTrash(noteId: Long) {
+        notes.find { it.id == noteId }?.apply {
+            isDeleted = true
+            deletedDate = System.currentTimeMillis()
+        }
+    }
+
+    fun restoreNoteFromTrash(noteId: Long) {
+        notes.find { it.id == noteId }?.apply {
+            isDeleted = false
+            deletedDate = null
+        }
+    }
+
+    fun getTrashNotes(): List<Note> =
+        notes.filter { it.isDeleted }.sortedByDescending { it.deletedDate }
+
+    fun deleteNotePermanently(noteId: Long) {
+        notes.removeIf { it.id == noteId }
+    }
+
+    fun emptyTrash() {
+        notes.removeIf { it.isDeleted }
+    }
+
+    // Update the generateDummyNotes method to include the new fields
+    fun generateDummyNotes(count: Int): List<Note> {
+        notes.clear()
+        repeat(count) {
+            val title = dummyTitles[Random.nextInt(dummyTitles.size)]
+            val content = dummyContents[Random.nextInt(dummyContents.size)]
+            val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000)
+            val isFavorite = Random.nextBoolean()
+            val isDeleted = Random.nextDouble() < 0.1 // 10% chance of being in trash
+            val deletedDate = if (isDeleted) System.currentTimeMillis() - Random.nextLong(0, 7L * 24 * 60 * 60 * 1000) else null
+
+            notes.add(Note(
+                id = ++lastNoteId,
+                title = title,
+                content = content,
+                timestamp = timestamp,
+                isFavorite = isFavorite,
+                isDeleted = isDeleted,
+                deletedDate = deletedDate
+            ))
+        }
+        return getAllNotes() // Return only non-deleted notes
+    }
 }
+

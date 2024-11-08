@@ -1,10 +1,12 @@
 package com.example.noteon
 
 data class Note(
-    var id: Long = 0,
-    var title: String,
-    var content: String,
+    val id: Long,
+    val title: String,
+    val content: String,
     var folderId: Long = 0,
-    var timestamp: Long = System.currentTimeMillis(),
-    var isFavorite: Boolean = false
+    var isFavorite: Boolean = false,
+    var isDeleted: Boolean = false,
+    var deletedDate: Long? = null,
+    val timestamp: Long = System.currentTimeMillis()
 )

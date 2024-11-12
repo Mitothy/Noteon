@@ -55,4 +55,7 @@
     <string name="send_message">Send message</string>
     <string name="chat_with_bot">Chat with bot</string>
     <string name="back">Back</string>
+    <string name="login">Login</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="guest_user">You are currently using Noteon as a guest.</string>
 </resources>

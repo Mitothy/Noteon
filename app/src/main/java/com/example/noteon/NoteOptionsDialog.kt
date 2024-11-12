@@ -6,14 +6,13 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 class NoteOptionsDialog(private val context: Context) {
     fun show(
         note: Note,
-        currentFolderId: Long = 0,
         isTrashView: Boolean = false,
         onUpdate: () -> Unit
     ) {
         if (isTrashView) {
             showTrashOptions(note, onUpdate)
         } else {
-            showNormalOptions(note, currentFolderId, onUpdate)
+            showNormalOptions(note, onUpdate)
         }
     }
 
@@ -47,7 +46,7 @@ class NoteOptionsDialog(private val context: Context) {
             .show()
     }
 
-    private fun showNormalOptions(note: Note, currentFolderId: Long, onUpdate: () -> Unit) {
+    private fun showNormalOptions(note: Note, onUpdate: () -> Unit) {
         val options = arrayOf(
             context.getString(if (note.isFavorite) R.string.remove_from_favorites else R.string.add_to_favorites),
             context.getString(R.string.move_to_folder),

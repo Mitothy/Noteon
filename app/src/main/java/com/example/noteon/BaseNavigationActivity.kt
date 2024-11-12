@@ -2,10 +2,12 @@ package com.example.noteon
 
 import android.content.Intent
 import android.view.MenuItem
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.navigation.NavigationView
 
 abstract class BaseNavigationActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
@@ -29,6 +31,24 @@ abstract class BaseNavigationActivity : AppCompatActivity(), NavigationView.OnNa
                 }
             }
         })
+    }
+
+    protected fun setupNavigationFooter() {
+        val navigationView = findViewById<NavigationView>(R.id.navigationView)
+        val loginButton = navigationView.findViewById<MaterialButton>(R.id.buttonLogin)
+        val signUpButton = navigationView.findViewById<MaterialButton>(R.id.buttonSignUp)
+
+        loginButton?.setOnClickListener {
+            drawerLayout.closeDrawer(GravityCompat.START)
+            // TODO: Implement login functionality
+            Toast.makeText(this, "Login clicked", Toast.LENGTH_SHORT).show()
+        }
+
+        signUpButton?.setOnClickListener {
+            drawerLayout.closeDrawer(GravityCompat.START)
+            // TODO: Implement signup functionality
+            Toast.makeText(this, "Sign up clicked", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {

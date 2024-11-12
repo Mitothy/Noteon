@@ -86,6 +86,7 @@ class MainActivity : BaseNavigationActivity() {
         setupRecyclerView()
         setupFab()
         setupSearchView()
+        setupNavigationFooter()
 
         currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
         intent.getStringExtra(EXTRA_VIEW_TYPE)?.let { viewTypeName ->
@@ -128,7 +129,6 @@ class MainActivity : BaseNavigationActivity() {
             onNoteOptions = { note ->
                 NoteOptionsDialog(this).show(
                     note = note,
-                    currentFolderId = currentFolderId,
                     isTrashView = currentView == ViewType.TRASH
                 ) {
                     updateNotesList()

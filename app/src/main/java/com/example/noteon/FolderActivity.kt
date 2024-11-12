@@ -33,6 +33,7 @@ class FolderActivity : BaseNavigationActivity() {
         setupRecyclerView()
         setupFab()
         setupSearchView()
+        setupNavigationFooter()
 
         navigationView = findViewById(R.id.navigationView)
         navigationView.setNavigationItemSelectedListener(this)

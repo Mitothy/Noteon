@@ -1,7 +1,7 @@
 package com.example.noteon
 
 import android.content.Context
-import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class NoteOptionsDialog(private val context: Context) {
     fun show(
@@ -18,7 +18,8 @@ class NoteOptionsDialog(private val context: Context) {
     }
 
     private fun showTrashOptions(note: Note, onUpdate: () -> Unit) {
-        AlertDialog.Builder(context)
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.note_options)
             .setItems(arrayOf(
                 context.getString(R.string.restore),
                 context.getString(R.string.delete_permanently)
@@ -35,7 +36,7 @@ class NoteOptionsDialog(private val context: Context) {
     }
 
     private fun showDeletePermanentlyDialog(note: Note, onUpdate: () -> Unit) {
-        AlertDialog.Builder(context)
+        MaterialAlertDialogBuilder(context)
             .setTitle(R.string.delete_permanently)
             .setMessage(R.string.delete_permanently_message)
             .setPositiveButton(R.string.delete) { _, _ ->
@@ -53,7 +54,8 @@ class NoteOptionsDialog(private val context: Context) {
             context.getString(R.string.move_to_trash)
         )
 
-        AlertDialog.Builder(context)
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.note_options)
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> {
@@ -88,7 +90,7 @@ class NoteOptionsDialog(private val context: Context) {
             }
         }
 
-        AlertDialog.Builder(context)
+        MaterialAlertDialogBuilder(context)
             .setTitle(R.string.move_to_folder)
             .setItems(options.toTypedArray()) { _, which ->
                 val selectedFolderId = folderIds[which]

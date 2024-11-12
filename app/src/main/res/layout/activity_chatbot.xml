@@ -45,6 +45,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:autofillHints="@string/chatbot"
                 android:background="@drawable/bg_chat_input"
                 android:hint="@string/type_message"
                 android:inputType="textMultiLine"

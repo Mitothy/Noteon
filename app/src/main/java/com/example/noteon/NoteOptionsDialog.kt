@@ -62,7 +62,7 @@ class NoteOptionsDialog(private val context: Context) {
                         DataHandler.toggleNoteFavorite(note.id)
                         onUpdate()
                     }
-                    1 -> showMoveToFolderDialog(note, currentFolderId, onUpdate)
+                    1 -> showMoveToFolderDialog(note, onUpdate)
                     2 -> {
                         DataHandler.moveNoteToTrash(note.id)
                         onUpdate()
@@ -72,7 +72,7 @@ class NoteOptionsDialog(private val context: Context) {
             .show()
     }
 
-    private fun showMoveToFolderDialog(note: Note, currentViewFolderId: Long, onUpdate: () -> Unit) {
+    private fun showMoveToFolderDialog(note: Note, onUpdate: () -> Unit) {
         val options = mutableListOf<String>()
         val folderIds = mutableListOf<Long>()
 

@@ -18,6 +18,7 @@ class MainActivity : BaseNavigationActivity() {
     private lateinit var recyclerViewNotes: RecyclerView
     private lateinit var navigationView: NavigationView
     private lateinit var fabAddNote: FloatingActionButton
+    private lateinit var fabChatbot: FloatingActionButton
     private lateinit var searchView: SearchView
     private lateinit var notesAdapter: NotesAdapter
     private lateinit var notes: List<Note>
@@ -61,6 +62,7 @@ class MainActivity : BaseNavigationActivity() {
         drawerLayout = findViewById(R.id.drawerLayout)
         recyclerViewNotes = findViewById(R.id.recyclerViewNotes)
         fabAddNote = findViewById(R.id.fabAddNote)
+        fabChatbot = findViewById(R.id.fabChatbot)
         searchView = findViewById(R.id.searchView)
 
         val toggle = ActionBarDrawerToggle(
@@ -142,6 +144,9 @@ class MainActivity : BaseNavigationActivity() {
             val intent = Intent(this, AddNoteActivity::class.java)
             intent.putExtra("folder_id", currentFolderId)
             startActivity(intent)
+        }
+        fabChatbot.setOnClickListener {
+            startActivity(Intent(this, ChatbotActivity::class.java))
         }
     }
 

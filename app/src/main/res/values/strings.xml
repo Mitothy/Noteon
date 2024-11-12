@@ -50,4 +50,9 @@
     <string name="discard_changes">Discard Changes?</string>
     <string name="discard_changes_message">You have unsaved changes. Are you sure you want to discard them?</string>
     <string name="discard">Discard</string>
+    <string name="chatbot">Chatbot</string>
+    <string name="type_message">Type a message</string>
+    <string name="send_message">Send message</string>
+    <string name="chat_with_bot">Chat with bot</string>
+    <string name="back">Back</string>
 </resources>

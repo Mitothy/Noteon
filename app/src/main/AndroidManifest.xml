@@ -31,6 +31,10 @@
             android:name=".FolderActivity"
             android:exported="false"
             android:label="@string/folders" />
+        <activity
+            android:name=".ChatbotActivity"
+            android:label="@string/chatbot"
+            android:parentActivityName=".MainActivity" />
     </application>
 
 </manifest>

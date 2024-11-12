@@ -63,6 +63,15 @@
             android:contentDescription="@string/add_note"
             android:src="@android:drawable/ic_input_add" />
 
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabChatbot"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|bottom"
+            android:layout_margin="16dp"
+            android:contentDescription="@string/chat_with_bot"
+            android:src="@android:drawable/ic_dialog_email" />
+
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
     <com.google.android.material.navigation.NavigationView

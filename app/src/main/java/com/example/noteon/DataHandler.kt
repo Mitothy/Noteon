@@ -29,6 +29,35 @@ object DataHandler {
         "Math: pg 45-47, Science: lab report, English: essay outline"
     )
 
+    init {
+        if (notes.isEmpty()) {
+            generateDummyNotes(20)
+        }
+    }
+
+    private fun generateDummyNotes(count: Int): List<Note> {
+        notes.clear()
+        repeat(count) {
+            val title = dummyTitles[Random.nextInt(dummyTitles.size)]
+            val content = dummyContents[Random.nextInt(dummyContents.size)]
+            val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000)
+            val isFavorite = Random.nextBoolean()
+            val isDeleted = Random.nextDouble() < 0.1 // 10% chance of being in trash
+            val deletedDate = if (isDeleted) System.currentTimeMillis() - Random.nextLong(0, 7L * 24 * 60 * 60 * 1000) else null
+
+            notes.add(Note(
+                id = ++lastNoteId,
+                title = title,
+                content = content,
+                timestamp = timestamp,
+                isFavorite = isFavorite,
+                isDeleted = isDeleted,
+                deletedDate = deletedDate
+            ))
+        }
+        return getAllNotes() // Return only non-deleted notes
+    }
+
     fun createFolder(name: String, description: String): Folder {
         val folder = Folder(++lastFolderId, name, description)
         folders.add(folder)
@@ -117,30 +146,6 @@ object DataHandler {
 
     fun emptyTrash() {
         notes.removeIf { it.isDeleted }
-    }
-
-    // Update the generateDummyNotes method to include the new fields
-    fun generateDummyNotes(count: Int): List<Note> {
-        notes.clear()
-        repeat(count) {
-            val title = dummyTitles[Random.nextInt(dummyTitles.size)]
-            val content = dummyContents[Random.nextInt(dummyContents.size)]
-            val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000)
-            val isFavorite = Random.nextBoolean()
-            val isDeleted = Random.nextDouble() < 0.1 // 10% chance of being in trash
-            val deletedDate = if (isDeleted) System.currentTimeMillis() - Random.nextLong(0, 7L * 24 * 60 * 60 * 1000) else null
-
-            notes.add(Note(
-                id = ++lastNoteId,
-                title = title,
-                content = content,
-                timestamp = timestamp,
-                isFavorite = isFavorite,
-                isDeleted = isDeleted,
-                deletedDate = deletedDate
-            ))
-        }
-        return getAllNotes() // Return only non-deleted notes
     }
 }
 

@@ -3,22 +3,18 @@ package com.example.noteon
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.MenuItem
 import androidx.appcompat.app.ActionBarDrawerToggle
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
-import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 
-class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
+class MainActivity : BaseNavigationActivity() {
 
-    private lateinit var drawerLayout: DrawerLayout
+    override lateinit var drawerLayout: DrawerLayout
     private lateinit var recyclerViewNotes: RecyclerView
     private lateinit var navigationView: NavigationView
     private lateinit var fabAddNote: FloatingActionButton
@@ -27,6 +23,14 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private lateinit var notes: List<Note>
     private var currentFolderId: Long = 0
     private var currentView = ViewType.ALL_NOTES
+
+    override val currentNavigationItem: Int
+        get() = when (currentView) {
+            ViewType.ALL_NOTES -> R.id.nav_all_notes
+            ViewType.FAVORITES -> R.id.nav_favorites
+            ViewType.FOLDER -> R.id.nav_folders
+            ViewType.TRASH -> R.id.nav_trash
+        }
 
     enum class ViewType {
         ALL_NOTES,
@@ -70,7 +74,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         navigationView = findViewById(R.id.navigationView)
         navigationView.setNavigationItemSelectedListener(this)
 
-        notes = DataHandler.generateDummyNotes(20)
         val folderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
         notes = if (folderId == 0L) {
             DataHandler.getAllNotes()
@@ -121,79 +124,17 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             notes = notes,
             onNoteClick = { note -> openNoteDetail(note.id) },
             onNoteOptions = { note ->
-                if (currentView == ViewType.TRASH) {
-                    showTrashOptions(note)
-                } else {
-                    showNormalOptions(note)
+                NoteOptionsDialog(this).show(
+                    note = note,
+                    currentFolderId = currentFolderId,
+                    isTrashView = currentView == ViewType.TRASH
+                ) {
+                    updateNotesList()
                 }
             }
         )
         recyclerViewNotes.layoutManager = LinearLayoutManager(this)
         recyclerViewNotes.adapter = notesAdapter
-    }
-
-    private fun showTrashOptions(note: Note) {
-        AlertDialog.Builder(this)
-            .setItems(arrayOf(
-                getString(R.string.restore),
-                getString(R.string.delete_permanently)
-            )) { _, which ->
-                when (which) {
-                    0 -> {
-                        DataHandler.restoreNoteFromTrash(note.id)
-                        updateNotesList()
-                    }
-                    1 -> showDeletePermanentlyDialog(note)
-                }
-            }
-            .show()
-    }
-
-    private fun showDeletePermanentlyDialog(note: Note) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.delete_permanently)
-            .setMessage(R.string.delete_permanently_message)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                DataHandler.deleteNotePermanently(note.id)
-                updateNotesList()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun showNormalOptions(note: Note) {
-        val options = arrayOf(
-            getString(if (note.isFavorite) R.string.remove_from_favorites else R.string.add_to_favorites),
-            getString(R.string.move_to_folder),
-            getString(R.string.move_to_trash)
-        )
-
-        AlertDialog.Builder(this)
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> {
-                        DataHandler.toggleNoteFavorite(note.id)
-                        updateNotesList()
-                    }
-                    1 -> {
-                        MoveNoteDialog(this).show(
-                            noteId = note.id,
-                            currentFolderId = currentFolderId
-                        ) { newFolderId ->
-                            if (currentView == ViewType.FAVORITES && !note.isFavorite) {
-                                updateNotesList()
-                            } else if (currentFolderId != 0L && newFolderId != currentFolderId) {
-                                updateNotesList()
-                            }
-                        }
-                    }
-                    2 -> {
-                        DataHandler.moveNoteToTrash(note.id)
-                        updateNotesList()
-                    }
-                }
-            }
-            .show()
     }
 
     private fun setupFab() {
@@ -235,15 +176,16 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         startActivity(intent)
     }
 
-    override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
+    override fun onResume() {
+        super.onResume()
+        updateNotesList()
+    }
+
+    override fun onNavigationChanged(itemId: Int) {
+        when (itemId) {
             R.id.nav_all_notes -> {
                 currentView = ViewType.ALL_NOTES
                 currentFolderId = 0
-            }
-            R.id.nav_folders -> {
-                startActivity(Intent(this, FolderActivity::class.java))
-                return true
             }
             R.id.nav_favorites -> {
                 currentView = ViewType.FAVORITES
@@ -253,34 +195,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 currentView = ViewType.TRASH
                 currentFolderId = 0
             }
-            R.id.nav_settings -> {
-                // Handle settings action
-                return true
-            }
-            R.id.nav_about -> {
-                // Handle about action
-                return true
-            }
         }
         updateNotesList()
         updateTitle()
         updateNavigationSelection()
-        drawerLayout.closeDrawer(GravityCompat.START)
-        return true
-    }
-
-    @Deprecated("This method has been deprecated in favor of using the\n      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.\n      The OnBackPressedDispatcher controls how back button events are dispatched\n      to one or more {@link OnBackPressedCallback} objects.")
-    override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        updateNotesList()
     }
 
     private fun updateNavigationSelection() {

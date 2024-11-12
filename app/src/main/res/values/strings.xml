@@ -20,9 +20,9 @@
     <string name="cancel">Cancel</string>
     <string name="create">Create</string>
     <string name="folders">Folders</string>
-    <string name="search_folders">Search folders</string>
+    <string name="search_folders">Search folders…</string>
     <string name="folder_description">Folder description</string>
-    <string name="move_to_folder">Move to folder</string>
+    <string name="move_to_folder">Move to folder…</string>
     <string name="note_options">Note options</string>
     <string name="folder_options">Folder Options</string>
     <string name="edit_folder">Edit Folder</string>
@@ -36,7 +36,6 @@
     <string name="new_note_in_folder">New Note in %1$s</string>
     <string name="add_to_favorites">Add to favorites</string>
     <string name="remove_from_favorites">Remove from favorites</string>
-    <string name="move_to">Move to…</string>
     <string name="empty_trash">Empty Trash</string>
     <string name="empty_trash_message">Are you sure you want to permanently delete all items in the trash?</string>
     <string name="no_items_in_trash">No items in trash</string>

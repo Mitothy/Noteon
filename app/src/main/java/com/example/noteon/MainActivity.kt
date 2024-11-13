@@ -133,6 +133,9 @@ class MainActivity : BaseNavigationActivity() {
                 ) {
                     updateNotesList()
                 }
+            },
+            onAIOptions = { note ->
+                AIOptionsDialog(this).show(note)
             }
         )
         recyclerViewNotes.layoutManager = LinearLayoutManager(this)

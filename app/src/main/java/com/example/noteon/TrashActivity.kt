@@ -36,7 +36,10 @@ class TrashActivity : AppCompatActivity() {
         trashAdapter = NotesAdapter(
             notes = emptyList(),
             onNoteClick = { note -> showRestoreDialog(note) },
-            onNoteOptions = { note -> showTrashOptions(note) }
+            onNoteOptions = { note -> showTrashOptions(note) },
+            onAIOptions = { note ->
+                AIOptionsDialog(this).show(note)
+            }
         )
         recyclerViewTrash.apply {
             layoutManager = LinearLayoutManager(this@TrashActivity)

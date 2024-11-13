@@ -16,14 +16,35 @@ class ChatbotActivity : AppCompatActivity() {
     private lateinit var toolbar: Toolbar
     private val messages = mutableListOf<ChatMessage>()
 
+    private var noteId: Long = -1
+    private var noteTitle: String? = null
+    private var chatMode: ChatMode = ChatMode.GENERAL
+
+    companion object {
+        const val EXTRA_NOTE_ID = "extra_note_id"
+        const val EXTRA_NOTE_TITLE = "extra_note_title"
+        const val EXTRA_CHAT_MODE = "extra_chat_mode"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chatbot)
+
+        noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1)
+        noteTitle = intent.getStringExtra(EXTRA_NOTE_TITLE)
+        chatMode = try {
+            ChatMode.valueOf(intent.getStringExtra(EXTRA_CHAT_MODE) ?: ChatMode.GENERAL.name)
+        } catch (e: IllegalArgumentException) {
+            ChatMode.GENERAL
+        }
 
         setupToolbar()
         setupViews()
         setupRecyclerView()
         setupSendButton()
+
+        // Add initial message based on mode
+        addInitialMessage()
     }
 
     private fun setupToolbar() {
@@ -32,7 +53,13 @@ class ChatbotActivity : AppCompatActivity() {
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setDisplayShowHomeEnabled(true)
-        supportActionBar?.title = getString(R.string.chatbot)
+
+        // Set title based on mode
+        val title = when {
+            noteTitle != null -> getString(R.string.chatbot_note_title, noteTitle)
+            else -> getString(R.string.chatbot)
+        }
+        supportActionBar?.title = title
     }
 
     private fun setupViews() {
@@ -67,12 +94,39 @@ class ChatbotActivity : AppCompatActivity() {
         chatAdapter.notifyItemInserted(messages.size - 1)
 
         // Add chatbot response
-        val response = "I understand you're asking about: '$message'. This is a placeholder response."
+        val note = if (noteId != -1L) DataHandler.getNoteById(noteId) else null
+        val response = when {
+            note != null -> "I understand you're asking about the note '${note.title}': '$message'. This is a placeholder response."
+            else -> "I understand you're asking about: '$message'. This is a placeholder response."
+        }
         messages.add(ChatMessage(response, false))
         chatAdapter.notifyItemInserted(messages.size - 1)
 
-        // Scroll to bottom
+        // Scroll to bottom and clear input
         recyclerView.scrollToPosition(messages.size - 1)
+        editTextMessage.text.clear()
+    }
+
+    private fun addInitialMessage() {
+        if (noteId != -1L) {
+            val note = DataHandler.getNoteById(noteId)
+            note?.let {
+                val initialMessage = when (chatMode) {
+                    ChatMode.CHAT -> getString(R.string.chat_with_note_intro, note.title)
+                    ChatMode.SUMMARIZE -> {
+                        messages.add(ChatMessage("Please summarize this note: ${note.title}", true))
+                        getString(R.string.summarize_content_response, note.title)
+                    }
+                    ChatMode.GENERAL -> getString(R.string.chatbot_welcome)
+                }
+                messages.add(ChatMessage(initialMessage, false))
+                chatAdapter.notifyDataSetChanged()
+                recyclerView.scrollToPosition(messages.size - 1)
+            }
+        } else {
+            messages.add(ChatMessage(getString(R.string.chatbot_welcome), false))
+            chatAdapter.notifyDataSetChanged()
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {

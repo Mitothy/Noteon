@@ -54,8 +54,15 @@
     <string name="type_message">Type a message</string>
     <string name="send_message">Send message</string>
     <string name="chat_with_bot">Chat with bot</string>
+    <string name="chatbot_note_title">Chatbot: %1$s</string>
+    <string name="chat_with_note_intro">I\'m ready to chat about the note \"%1$s\". What would you like to know?</string>
+    <string name="summarize_content_response">Here\'s a summary of the note \"%1$s\": [Placeholder summary]</string>
+    <string name="chatbot_welcome">Hello! How can I help you today?</string>
     <string name="back">Back</string>
     <string name="login">Login</string>
     <string name="sign_up">Sign Up</string>
     <string name="guest_user">You are currently using Noteon as a guest.</string>
+    <string name="ai_options">AI Options</string>
+    <string name="chat_with_note">Chat with note</string>
+    <string name="summarize_content">Summarize content</string>
 </resources>

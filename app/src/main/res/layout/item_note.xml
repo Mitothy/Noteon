@@ -40,15 +40,53 @@
 
         </LinearLayout>
 
-        <ImageButton
-            android:id="@+id/buttonOptions"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="center_vertical"
-            android:layout_marginEnd="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/note_options"
-            android:src="@android:drawable/ic_menu_more" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingEnd="4dp"
+            android:paddingStart="4dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonOptions"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginBottom="4dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:cornerRadius="21dp"
+                app:strokeWidth="0dp"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="8dp"
+                app:icon="@drawable/ic_more_vert"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconTint="?attr/colorOnSurface"
+                android:contentDescription="@string/note_options"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buttonAIOptions"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginTop="4dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:cornerRadius="21dp"
+                app:strokeWidth="0dp"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="8dp"
+                app:icon="@drawable/ic_smart_toy"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconTint="?attr/colorOnSurface"
+                android:contentDescription="@string/ai_options"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 

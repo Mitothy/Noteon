@@ -11,11 +11,13 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:minHeight="106dp"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
 
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
             android:padding="16dp">
@@ -32,11 +34,13 @@
             <TextView
                 android:id="@+id/textViewContent"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:layout_marginTop="8dp"
                 android:textSize="14sp"
                 android:maxLines="2"
-                android:ellipsize="end" />
+                android:ellipsize="end"
+                android:lineSpacingExtra="4dp" />
 
         </LinearLayout>
 
@@ -50,11 +54,11 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonOptions"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:layout_marginBottom="4dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginBottom="1dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:cornerRadius="21dp"
+                app:cornerRadius="24dp"
                 app:strokeWidth="0dp"
                 android:insetLeft="0dp"
                 android:insetTop="0dp"
@@ -69,11 +73,11 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonAIOptions"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:layout_marginTop="4dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="1dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:cornerRadius="21dp"
+                app:cornerRadius="24dp"
                 app:strokeWidth="0dp"
                 android:insetLeft="0dp"
                 android:insetTop="0dp"

@@ -86,13 +86,13 @@ abstract class BaseNavigationActivity : AppCompatActivity(), NavigationView.OnNa
                 finish()
             }
             R.id.nav_settings -> {
-                // Handle settings action
-                onNavigationChanged(item.itemId)
+                startActivity(Intent(this, SettingsActivity::class.java))
+                drawerLayout.closeDrawer(GravityCompat.START)
                 return true
             }
             R.id.nav_about -> {
-                // Handle about action
-                onNavigationChanged(item.itemId)
+                startActivity(Intent(this, AboutActivity::class.java))
+                drawerLayout.closeDrawer(GravityCompat.START)
                 return true
             }
         }

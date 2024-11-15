@@ -65,4 +65,14 @@
     <string name="ai_options">AI Options</string>
     <string name="chat_with_note">Chat with note</string>
     <string name="summarize_content">Summarize content</string>
+    <string name="ai_features">AI Features</string>
+    <string name="intelligent_search">Intelligent Search</string>
+    <string name="intelligent_search_description">Enable AI-powered search to find notes based on context and meaning, not just exact matches</string>
+    <string name="smart_categorization">Smart Categorization</string>
+    <string name="smart_categorization_description">When in the menu to move notes into a folder, use AI to sort the folders based on the best match</string>
+    <string name="version">Version 1.0.0</string>
+    <string name="about_description">Noteon is an intelligent note-taking app that helps you organize your thoughts, ideas, and important information. With built-in AI features, it makes managing and finding your notes easier than ever.</string>
+    <string name="developed_by">Developed by Kieffer and Tim</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="terms_of_service">Terms of Service</string>
 </resources>

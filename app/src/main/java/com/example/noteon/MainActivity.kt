@@ -3,14 +3,19 @@ package com.example.noteon
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
+import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
+import kotlinx.coroutines.launch
 
 class MainActivity : BaseNavigationActivity() {
 
@@ -24,6 +29,7 @@ class MainActivity : BaseNavigationActivity() {
     private lateinit var notes: List<Note>
     private var currentFolderId: Long = 0
     private var currentView = ViewType.ALL_NOTES
+    private lateinit var authManager: AuthManager  // Add this
 
     override val currentNavigationItem: Int
         get() = when (currentView) {
@@ -55,6 +61,16 @@ class MainActivity : BaseNavigationActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Initialize AuthManager
+        authManager = AuthManager.getInstance(this)
+
+        // Check if user is signed in
+        if (authManager.currentUser == null) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
 
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -102,6 +118,44 @@ class MainActivity : BaseNavigationActivity() {
         updateNotesList()
         updateTitle()
         updateNavigationSelection()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Inflate the menu resource
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_sync -> {
+                syncNotes()
+                true
+            }
+            R.id.action_sign_out -> {
+                signOut()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun syncNotes() {
+        lifecycleScope.launch {
+            try {
+                Toast.makeText(this@MainActivity, R.string.sync_in_progress, Toast.LENGTH_SHORT).show()
+                authManager.backupNotes()
+                Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, R.string.sync_error, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun signOut() {
+        authManager.signOut()
+        startActivity(Intent(this, LoginActivity::class.java))
+        finish()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -218,7 +272,6 @@ class MainActivity : BaseNavigationActivity() {
         }
         navigationView.setCheckedItem(menuItemId)
     }
-
 
     private fun updateNotesList() {
         notes = when (currentView) {

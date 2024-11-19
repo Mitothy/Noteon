@@ -1,11 +1,27 @@
 package com.example.noteon
 
+import android.util.Log
+import com.google.firebase.firestore.FirebaseFirestore
+
 object DataHandler {
     private lateinit var dbHelper: DatabaseHelper
 
     // Initialize with context
     fun initialize(context: android.content.Context) {
         dbHelper = DatabaseHelper(context)
+    }
+
+    fun storeUserInfo(user: User) {
+        val db = FirebaseFirestore.getInstance()
+        db.collection("users")
+            .document(user.id ?: "")
+            .set(user)
+            .addOnSuccessListener {
+                Log.d("DataHandler", "User profile created successfully")
+            }
+            .addOnFailureListener { e ->
+                Log.w("DataHandler", "Error creating user profile", e)
+            }
     }
 
     fun addNote(title: String, content: String, folderId: Long = 0): Note {
@@ -105,4 +121,16 @@ object DataHandler {
     }
 
     fun searchFolders(query: String): List<Folder> = dbHelper.searchFolders(query)
+
+    fun markNoteAsSynced(noteId: Long, userId: String) {
+        getNoteById(noteId)?.let { note ->
+            val updatedNote = note.copy(isSynced = true, userId = userId)
+            dbHelper.updateNote(updatedNote)
+        }
+    }
+
+    fun addNoteFromSync(note: Note): Note {
+        val id = dbHelper.addNote(note)
+        return note.copy(id = id)
+    }
 }

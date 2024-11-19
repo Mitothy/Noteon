@@ -8,5 +8,8 @@ data class Note(
     var isFavorite: Boolean = false,
     var isDeleted: Boolean = false,
     var deletedDate: Long? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    var isSynced: Boolean = false,  // Track if note is synced to Firebase
+    var userId: String? = null      // Firebase user ID
 )
+

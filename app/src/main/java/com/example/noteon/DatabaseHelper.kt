@@ -9,7 +9,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "noteon.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2  // Increment version number
 
         // Table Names
         private const val TABLE_NOTES = "notes"
@@ -26,6 +26,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private const val KEY_IS_FAVORITE = "is_favorite"
         private const val KEY_IS_DELETED = "is_deleted"
         private const val KEY_DELETED_DATE = "deleted_date"
+        private const val KEY_IS_SYNCED = "is_synced"
+        private const val KEY_USER_ID = "user_id"
 
         // FOLDERS Table - column names
         private const val KEY_NAME = "name"
@@ -41,7 +43,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 $KEY_IS_FAVORITE INTEGER DEFAULT 0,
                 $KEY_IS_DELETED INTEGER DEFAULT 0,
                 $KEY_DELETED_DATE INTEGER,
-                $KEY_TIMESTAMP INTEGER NOT NULL
+                $KEY_TIMESTAMP INTEGER NOT NULL,
+                $KEY_IS_SYNCED INTEGER DEFAULT 0,
+                $KEY_USER_ID TEXT
             )
         """
 
@@ -61,11 +65,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Drop older tables if existed
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_FOLDERS")
-        // Create tables again
-        onCreate(db)
+        if (oldVersion < 2) {
+            // Add new columns for Firebase sync
+            db.execSQL("ALTER TABLE $TABLE_NOTES ADD COLUMN $KEY_IS_SYNCED INTEGER DEFAULT 0")
+            db.execSQL("ALTER TABLE $TABLE_NOTES ADD COLUMN $KEY_USER_ID TEXT")
+        }
     }
 
     // Note CRUD Operations
@@ -79,32 +83,10 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put(KEY_IS_DELETED, if (note.isDeleted) 1 else 0)
             put(KEY_DELETED_DATE, note.deletedDate)
             put(KEY_TIMESTAMP, note.timestamp)
+            put(KEY_IS_SYNCED, if (note.isSynced) 1 else 0)
+            put(KEY_USER_ID, note.userId)
         }
         return db.insert(TABLE_NOTES, null, values)
-    }
-
-    fun getNoteById(id: Long): Note? {
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_NOTES,
-            null,
-            "$KEY_ID = ?",
-            arrayOf(id.toString()),
-            null, null, null
-        )
-
-        return if (cursor.moveToFirst()) {
-            Note(
-                id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
-                title = cursor.getString(cursor.getColumnIndexOrThrow(KEY_TITLE)),
-                content = cursor.getString(cursor.getColumnIndexOrThrow(KEY_CONTENT)),
-                folderId = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_FOLDER_ID)),
-                isFavorite = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_FAVORITE)) == 1,
-                isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_DELETED)) == 1,
-                deletedDate = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_DELETED_DATE)),
-                timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP))
-            )
-        } else null.also { cursor.close() }
     }
 
     fun getAllNotes(): List<Note> {
@@ -129,12 +111,38 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     isFavorite = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_FAVORITE)) == 1,
                     isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_DELETED)) == 1,
                     deletedDate = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_DELETED_DATE)),
-                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP))
+                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)),
+                    isSynced = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_SYNCED)) == 1,
+                    userId = cursor.getString(cursor.getColumnIndexOrThrow(KEY_USER_ID))
                 ))
             } while (cursor.moveToNext())
         }
         cursor.close()
         return notes
+    }
+
+    fun getNoteById(id: Long): Note? {
+        val db = this.readableDatabase
+        val cursor = db.query(
+            TABLE_NOTES,
+            null,
+            "$KEY_ID = ?",
+            arrayOf(id.toString()),
+            null, null, null
+        )
+
+        return if (cursor.moveToFirst()) {
+            Note(
+                id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
+                title = cursor.getString(cursor.getColumnIndexOrThrow(KEY_TITLE)),
+                content = cursor.getString(cursor.getColumnIndexOrThrow(KEY_CONTENT)),
+                folderId = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_FOLDER_ID)),
+                isFavorite = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_FAVORITE)) == 1,
+                isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_DELETED)) == 1,
+                deletedDate = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_DELETED_DATE)),
+                timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP))
+            )
+        } else null.also { cursor.close() }
     }
 
     fun updateNote(note: Note): Int {
@@ -343,5 +351,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     fun emptyTrash() {
         val db = this.writableDatabase
         db.delete(TABLE_NOTES, "$KEY_IS_DELETED = 1", null)
+    }
+
+    fun updateNoteSync(noteId: Long, isSynced: Boolean, userId: String?) {
+        val db = this.writableDatabase
+        val values = ContentValues().apply {
+            put(KEY_IS_SYNCED, if (isSynced) 1 else 0)
+            put(KEY_USER_ID, userId)
+        }
+        db.update(TABLE_NOTES, values, "$KEY_ID = ?", arrayOf(noteId.toString()))
     }
 }

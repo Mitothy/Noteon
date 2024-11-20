@@ -1,17 +1,24 @@
 package com.example.noteon
 
+import android.content.Context
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 object DataHandler {
     private lateinit var dbHelper: DatabaseHelper
+    private var usersMap = mutableMapOf<String, User>()
 
     // Initialize with context
-    fun initialize(context: android.content.Context) {
+    fun initialize(context: Context) {
         dbHelper = DatabaseHelper(context)
     }
 
     fun storeUserInfo(user: User) {
+        // Store in local map
+        usersMap[user.id ?: ""] = user
+
+        // Store in Firebase
         val db = FirebaseFirestore.getInstance()
         db.collection("users")
             .document(user.id ?: "")
@@ -24,15 +31,82 @@ object DataHandler {
             }
     }
 
-    fun addNote(title: String, content: String, folderId: Long = 0): Note {
+    fun addNote(context: Context, title: String, content: String, folderId: Long = 0): Note {
+        val guestSession = GuestSession.getInstance(context)
         val note = Note(
             id = 0, // SQLite will auto-generate the ID
             title = title,
             content = content,
-            folderId = folderId
+            folderId = folderId,
+            userId = if (guestSession.isGuestSession()) {
+                guestSession.getGuestId()
+            } else {
+                AuthManager.getInstance(context).currentUser?.uid
+            }
         )
         val id = dbHelper.addNote(note)
         return note.copy(id = id)
+    }
+
+    fun clearGuestData(guestId: String) {
+        // Get all notes for the guest user
+        val guestNotes = getAllNotes().filter { it.userId == guestId }
+
+        // Delete each guest note
+        guestNotes.forEach { note ->
+            deleteNotePermanently(note.id)
+        }
+
+        // Also delete any folders created by guest
+        getAllFolders().forEach { folder ->
+            // Since folders don't have userId, we'll delete empty folders
+            if (getNotesInFolder(folder.id).isEmpty()) {
+                deleteFolder(folder.id)
+            }
+        }
+    }
+
+    suspend fun backupNotes(context: Context) {
+        val authManager = AuthManager.getInstance(context)
+
+        authManager.currentUser?.let { user ->
+            val notes = getAllNotes()
+            notes.forEach { note ->
+                // Only backup non-deleted notes that belong to the authenticated user
+                if (!note.isDeleted && note.userId == user.uid) {
+                    // Create a map of note data
+                    val noteMap = hashMapOf(
+                        "id" to note.id,
+                        "title" to note.title,
+                        "content" to note.content,
+                        "folderId" to note.folderId,
+                        "isFavorite" to note.isFavorite,
+                        "timestamp" to note.timestamp,
+                        "userId" to user.uid
+                    )
+
+                    // Save to Firebase
+                    val db = FirebaseFirestore.getInstance()
+                    db.collection("users")
+                        .document(user.uid)
+                        .collection("notes")
+                        .document(note.id.toString())
+                        .set(noteMap)
+                        .await()
+
+                    // Mark note as synced
+                    markNoteAsSynced(note.id, user.uid)
+                }
+            }
+        }
+    }
+
+    fun convertGuestNotesToUser(guestId: String, userId: String) {
+        val guestNotes = getAllNotes().filter { it.userId == guestId }
+        guestNotes.forEach { note ->
+            val updatedNote = note.copy(userId = userId)
+            dbHelper.updateNote(updatedNote)
+        }
     }
 
     fun getAllNotes(): List<Note> = dbHelper.getAllNotes()
@@ -132,5 +206,9 @@ object DataHandler {
     fun addNoteFromSync(note: Note): Note {
         val id = dbHelper.addNote(note)
         return note.copy(id = id)
+    }
+
+    fun getUserName(userId: String): String? {
+        return usersMap[userId]?.name
     }
 }

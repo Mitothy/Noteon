@@ -59,8 +59,15 @@ class SignUpActivity : BaseActivity() {
 
                         DataHandler.storeUserInfo(userInfo)
 
+                        // Update the auth manager's current user
+                        val authManager = AuthManager.getInstance(this)
+
                         Toast.makeText(this, "Registration Successful", Toast.LENGTH_SHORT).show()
-                        startActivity(Intent(this, MainActivity::class.java))
+
+                        // Start MainActivity with clear flags to remove the back stack
+                        val intent = Intent(this, MainActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
                         finish()
                     } else {
                         Toast.makeText(this, "Oops! Something went wrong", Toast.LENGTH_SHORT).show()

@@ -70,8 +70,8 @@ class AuthManager private constructor(private val context: Context) {
         currentUser?.let { user ->
             val notes = DataHandler.getAllNotes()
             notes.forEach { note ->
-                // Only backup non-deleted notes
-                if (!note.isDeleted) {
+                // Only backup non-deleted notes that belong to the authenticated user
+                if (!note.isDeleted && note.userId == user.uid) {
                     // Create a map of note data
                     val noteMap = hashMapOf(
                         "id" to note.id,

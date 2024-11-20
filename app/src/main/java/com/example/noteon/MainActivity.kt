@@ -5,14 +5,18 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.launch
@@ -29,7 +33,8 @@ class MainActivity : BaseNavigationActivity() {
     private lateinit var notes: List<Note>
     private var currentFolderId: Long = 0
     private var currentView = ViewType.ALL_NOTES
-    private lateinit var authManager: AuthManager  // Add this
+    private lateinit var authManager: AuthManager
+    private lateinit var guestSession: GuestSession  // Add this
 
     override val currentNavigationItem: Int
         get() = when (currentView) {
@@ -64,9 +69,10 @@ class MainActivity : BaseNavigationActivity() {
 
         // Initialize AuthManager
         authManager = AuthManager.getInstance(this)
+        guestSession = GuestSession.getInstance(this)
 
-        // Check if user is signed in
-        if (authManager.currentUser == null) {
+        // Check if user is signed in or in guest mode
+        if (authManager.currentUser == null && !GuestSession.getInstance(this).isGuestSession()) {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
             return
@@ -75,12 +81,27 @@ class MainActivity : BaseNavigationActivity() {
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
 
+        setupViews()
+        setupDrawer(toolbar)
+        setupFolderHandling()
+        setupRecyclerView()
+        setupFab()
+        setupSearchView()
+        setupNavigationFooter()
+        updateNavigationHeader()
+    }
+
+    private fun setupViews() {
         drawerLayout = findViewById(R.id.drawerLayout)
         recyclerViewNotes = findViewById(R.id.recyclerViewNotes)
         fabAddNote = findViewById(R.id.fabAddNote)
         fabChatbot = findViewById(R.id.fabChatbot)
         searchView = findViewById(R.id.searchView)
+        navigationView = findViewById(R.id.navigationView)
+        navigationView.setNavigationItemSelectedListener(this)
+    }
 
+    private fun setupDrawer(toolbar: Toolbar) {
         val toggle = ActionBarDrawerToggle(
             this, drawerLayout, toolbar,
             R.string.navigation_drawer_open,
@@ -88,23 +109,16 @@ class MainActivity : BaseNavigationActivity() {
         )
         drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
+    }
 
-        navigationView = findViewById(R.id.navigationView)
-        navigationView.setNavigationItemSelectedListener(this)
-
-        val folderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
-        notes = if (folderId == 0L) {
+    private fun setupFolderHandling() {
+        currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
+        notes = if (currentFolderId == 0L) {
             DataHandler.getAllNotes()
         } else {
-            DataHandler.getNotesInFolder(folderId)
+            DataHandler.getNotesInFolder(currentFolderId)
         }
 
-        setupRecyclerView()
-        setupFab()
-        setupSearchView()
-        setupNavigationFooter()
-
-        currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
         intent.getStringExtra(EXTRA_VIEW_TYPE)?.let { viewTypeName ->
             currentView = try {
                 ViewType.valueOf(viewTypeName)
@@ -115,63 +129,6 @@ class MainActivity : BaseNavigationActivity() {
             currentView = if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
         }
 
-        updateNotesList()
-        updateTitle()
-        updateNavigationSelection()
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu resource
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_sync -> {
-                syncNotes()
-                true
-            }
-            R.id.action_sign_out -> {
-                signOut()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
-    private fun syncNotes() {
-        lifecycleScope.launch {
-            try {
-                Toast.makeText(this@MainActivity, R.string.sync_in_progress, Toast.LENGTH_SHORT).show()
-                authManager.backupNotes()
-                Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, R.string.sync_error, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun signOut() {
-        authManager.signOut()
-        startActivity(Intent(this, LoginActivity::class.java))
-        finish()
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
-        intent.getStringExtra(EXTRA_VIEW_TYPE)?.let { viewTypeName ->
-            currentView = try {
-                ViewType.valueOf(viewTypeName)
-            } catch (e: IllegalArgumentException) {
-                if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
-            }
-        } ?: run {
-            currentView = if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
-        }
-        updateNotesList()
         updateTitle()
         updateNavigationSelection()
     }
@@ -218,6 +175,95 @@ class MainActivity : BaseNavigationActivity() {
                 return true
             }
         })
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        // Hide sync option for guest users
+        menu.findItem(R.id.action_sync)?.isVisible = !guestSession.isGuestSession()
+
+        // Change sign out text for guest users
+        menu.findItem(R.id.action_sign_out)?.title =
+            if (guestSession.isGuestSession())
+                getString(R.string.exit_guest_mode)
+            else
+                getString(R.string.sign_out)
+
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_sync -> {
+                syncNotes()
+                true
+            }
+            R.id.action_sign_out -> {
+                signOut()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun syncNotes() {
+        if (guestSession.isGuestSession()) {
+            Toast.makeText(this, R.string.sync_not_available_guest, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        lifecycleScope.launch {
+            try {
+                Toast.makeText(this@MainActivity, R.string.sync_in_progress, Toast.LENGTH_SHORT).show()
+                authManager.backupNotes()
+                Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, R.string.sync_error, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun signOut() {
+        if (guestSession.isGuestSession()) {
+            // Show confirmation dialog for guest mode exit
+            AlertDialog.Builder(this)
+                .setTitle(R.string.exit_guest_mode)
+                .setMessage(R.string.exit_guest_mode_message)
+                .setPositiveButton(R.string.exit) { _, _ ->
+                    guestSession.clearGuestData(this)
+                    startActivity(Intent(this, LoginActivity::class.java))
+                    finish()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        } else {
+            // Regular sign out
+            authManager.signOut()
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        currentFolderId = intent.getLongExtra(EXTRA_FOLDER_ID, 0)
+        intent.getStringExtra(EXTRA_VIEW_TYPE)?.let { viewTypeName ->
+            currentView = try {
+                ViewType.valueOf(viewTypeName)
+            } catch (e: IllegalArgumentException) {
+                if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
+            }
+        } ?: run {
+            currentView = if (currentFolderId == 0L) ViewType.ALL_NOTES else ViewType.FOLDER
+        }
+        updateNotesList()
+        updateTitle()
+        updateNavigationSelection()
     }
 
     private fun filterNotes(query: String?) {
@@ -290,6 +336,40 @@ class MainActivity : BaseNavigationActivity() {
             ViewType.FOLDER -> DataHandler.getFolderById(currentFolderId)?.name
                 ?: getString(R.string.all_notes)
             ViewType.TRASH -> getString(R.string.trash)
+        }
+    }
+
+    private fun updateNavigationHeader() {
+        val navigationView = findViewById<NavigationView>(R.id.navigationView)
+        val headerView = navigationView.getHeaderView(0)
+        val footerContainer = navigationView.findViewById<View>(R.id.nav_footer_container)
+        val usernameTextView = headerView.findViewById<TextView>(R.id.nav_header_username)
+        val emailTextView = headerView.findViewById<TextView>(R.id.nav_header_email)
+
+        when {
+            authManager.currentUser != null -> {
+                // User is logged in - existing logic
+                footerContainer?.visibility = View.GONE
+                val userName = DataHandler.getUserName(authManager.currentUser!!.uid)
+                if (userName != null) {
+                    usernameTextView?.text = userName
+                } else {
+                    usernameTextView?.text = authManager.currentUser!!.email?.substringBefore('@')?.capitalize()
+                }
+                emailTextView?.text = authManager.currentUser!!.email
+            }
+            GuestSession.getInstance(this).isGuestSession() -> {
+                // User is in guest mode
+                footerContainer?.visibility = View.VISIBLE
+                usernameTextView?.text = getString(R.string.app_name)
+                emailTextView?.text = getString(R.string.guest_user)
+            }
+            else -> {
+                // Not logged in and not in guest mode
+                footerContainer?.visibility = View.VISIBLE
+                usernameTextView?.text = getString(R.string.app_name)
+                emailTextView?.text = getString(R.string.guest_user)
+            }
         }
     }
 }

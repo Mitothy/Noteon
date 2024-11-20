@@ -100,4 +100,16 @@
     <string name="default_web_client_id">1000187328055-sle6einkhg2nctls75or461injt51ma0.apps.googleusercontent.com</string>
     <string name="please_wait">Please wait...</string>
     <string name="name">Name</string>
+    <string name="nav_username">Username</string>
+    <string name="nav_email">Email</string>
+    <string name="continue_as_guest">Continue as Guest</string>
+    <string name="guest_data_found">Guest Data Found</string>
+    <string name="convert_guest_data_message">Would you like to keep your guest notes and convert them to your account?</string>
+    <string name="convert">Keep Notes</string>
+    <string name="exit_guest_mode">Exit Guest Mode</string>
+    <string name="exit_guest_mode_message">Are you sure you want to exit guest mode? All guest notes will be deleted.</string>
+    <string name="exit">Exit</string>
+    <string name="guest_mode_description">You are currently in guest mode. Notes will be stored locally.</string>
+    <string name="please_sign_in">Please sign in to access all features</string>
+    <string name="sync_not_available_guest">Sync is not available in guest mode</string>
 </resources>

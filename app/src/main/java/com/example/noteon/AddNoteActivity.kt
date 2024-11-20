@@ -37,8 +37,8 @@ class AddNoteActivity : AppCompatActivity() {
         val content = editTextContent.text.toString().trim()
 
         if (title.isNotEmpty() && content.isNotEmpty()) {
-            // Use the folder ID when creating the note
-            DataHandler.addNote(title, content, folderId)
+            // Use the context-aware version of addNote to support guest mode
+            DataHandler.addNote(this, title, content, folderId)
             finish()
         }
     }

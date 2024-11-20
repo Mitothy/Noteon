@@ -8,6 +8,7 @@ import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -76,10 +77,23 @@ class LoginActivity : AppCompatActivity() {
             finish()
         }
 
+
         /* findViewById<MaterialButton>(R.id.buttonSignInWithGoogle)?.setOnClickListener {
             signInWithGoogle()
         }
          */
+
+        findViewById<MaterialButton>(R.id.buttonContinueAsGuest).setOnClickListener {
+            // Start guest session
+            GuestSession.getInstance(this).startGuestSession()
+
+            // Start MainActivity as guest
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            startActivity(intent)
+            finish()
+        }
     }
 
     private fun userLogin() {
@@ -91,6 +105,9 @@ class LoginActivity : AppCompatActivity() {
             auth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this) { task ->
                     if (task.isSuccessful) {
+                        // Handle guest data before proceeding
+                        handleGuestDataOnLogin()
+
                         startActivity(Intent(this, MainActivity::class.java))
                         finish()
                     } else {
@@ -100,6 +117,7 @@ class LoginActivity : AppCompatActivity() {
                 }
         }
     }
+
 
     private fun signInWithGoogle() {
         val signInIntent = googleSignInClient.signInIntent
@@ -178,5 +196,29 @@ class LoginActivity : AppCompatActivity() {
 
     private fun hideProgressBar() {
         // Implement progress bar hide logic
+    }
+
+    private fun handleGuestDataOnLogin() {
+        val guestSession = GuestSession.getInstance(this)
+        if (guestSession.isGuestSession()) {
+            // Show dialog to user
+            AlertDialog.Builder(this)
+                .setTitle(R.string.guest_data_found)
+                .setMessage(R.string.convert_guest_data_message)
+                .setPositiveButton(R.string.convert) { _, _ ->
+                    // Convert guest data to user data
+                    guestSession.getGuestId()?.let { guestId ->
+                        auth.currentUser?.uid?.let { userId ->
+                            DataHandler.convertGuestNotesToUser(guestId, userId)
+                        }
+                    }
+                    guestSession.endGuestSession()
+                }
+                .setNegativeButton(R.string.discard) { _, _ ->
+                    // Clear guest data
+                    guestSession.clearGuestData(this)
+                }
+                .show()
+        }
     }
 }

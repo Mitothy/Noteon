@@ -7,6 +7,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.widget.Toolbar
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class ChatbotActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
@@ -15,6 +17,7 @@ class ChatbotActivity : AppCompatActivity() {
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var toolbar: Toolbar
     private val messages = mutableListOf<ChatMessage>()
+    private val chatRepository = ChatRepository()
 
     private var noteId: Long = -1
     private var noteTitle: String? = null
@@ -43,8 +46,11 @@ class ChatbotActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSendButton()
 
-        // Add initial message based on mode
-        addInitialMessage()
+        // Start chat session and add initial message
+        lifecycleScope.launch {
+            chatRepository.startNewChat()
+            addInitialMessage()
+        }
     }
 
     private fun setupToolbar() {
@@ -89,42 +95,50 @@ class ChatbotActivity : AppCompatActivity() {
     }
 
     private fun sendMessage(message: String) {
-        // Add user message
-        messages.add(ChatMessage(message, true))
-        chatAdapter.notifyItemInserted(messages.size - 1)
+        lifecycleScope.launch {
+            try {
+                // Add user message immediately
+                messages.add(ChatMessage(message, true))
+                chatAdapter.notifyItemInserted(messages.size - 1)
+                recyclerView.scrollToPosition(messages.size - 1)
 
-        // Add chatbot response
-        val note = if (noteId != -1L) DataHandler.getNoteById(noteId) else null
-        val response = when {
-            note != null -> "I understand you're asking about the note '${note.title}': '$message'. This is a placeholder response."
-            else -> "I understand you're asking about: '$message'. This is a placeholder response."
+                // Get response from OpenAI
+                val updatedMessages = chatRepository.sendMessage(message)
+
+                // Clear existing messages and add all updated messages
+                messages.clear()
+                messages.addAll(updatedMessages)
+                chatAdapter.notifyDataSetChanged()
+                recyclerView.scrollToPosition(messages.size - 1)
+            } catch (e: Exception) {
+                messages.add(ChatMessage("Sorry, there was an error: ${e.message}", false))
+                chatAdapter.notifyItemInserted(messages.size - 1)
+                recyclerView.scrollToPosition(messages.size - 1)
+            }
         }
-        messages.add(ChatMessage(response, false))
-        chatAdapter.notifyItemInserted(messages.size - 1)
-
-        // Scroll to bottom and clear input
-        recyclerView.scrollToPosition(messages.size - 1)
-        editTextMessage.text.clear()
     }
 
-    private fun addInitialMessage() {
+    private suspend fun addInitialMessage() {
         if (noteId != -1L) {
             val note = DataHandler.getNoteById(noteId)
             note?.let {
                 val initialMessage = when (chatMode) {
-                    ChatMode.CHAT -> getString(R.string.chat_with_note_intro, note.title)
+                    ChatMode.CHAT -> {
+                        "I'd like to chat about the note titled '${note.title}'. Here's the content:\n\n${note.content}"
+                    }
                     ChatMode.SUMMARIZE -> {
-                        messages.add(ChatMessage("Please summarize this note: ${note.title}", true))
-                        getString(R.string.summarize_content_response, note.title)
+                        "Please summarize this note:\n\nTitle: ${note.title}\n\nContent: ${note.content}"
                     }
                     ChatMode.GENERAL -> getString(R.string.chatbot_welcome)
                 }
-                messages.add(ChatMessage(initialMessage, false))
+                val responses = chatRepository.sendMessage(initialMessage)
+                messages.addAll(responses)
                 chatAdapter.notifyDataSetChanged()
                 recyclerView.scrollToPosition(messages.size - 1)
             }
         } else {
-            messages.add(ChatMessage(getString(R.string.chatbot_welcome), false))
+            val responses = chatRepository.sendMessage(getString(R.string.chatbot_welcome))
+            messages.addAll(responses)
             chatAdapter.notifyDataSetChanged()
         }
     }

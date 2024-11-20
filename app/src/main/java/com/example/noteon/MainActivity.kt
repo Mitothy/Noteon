@@ -183,15 +183,18 @@ class MainActivity : BaseNavigationActivity() {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        // Hide sync option for guest users
-        menu.findItem(R.id.action_sync)?.isVisible = !guestSession.isGuestSession()
+        // Hide sync option for guest users or non-authenticated users
+        val isAuthenticated = authManager.currentUser != null
+        menu.findItem(R.id.action_sync)?.isVisible = isAuthenticated
 
-        // Change sign out text for guest users
+        // Set correct sign out text
         menu.findItem(R.id.action_sign_out)?.title =
             if (guestSession.isGuestSession())
                 getString(R.string.exit_guest_mode)
-            else
+            else if (isAuthenticated)
                 getString(R.string.sign_out)
+            else
+                getString(R.string.login)
 
         return super.onPrepareOptionsMenu(menu)
     }
@@ -240,9 +243,13 @@ class MainActivity : BaseNavigationActivity() {
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
-        } else {
-            // Regular sign out
+        } else if (authManager.currentUser != null) {
+            // Regular sign out for authenticated users
             authManager.signOut()
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+        } else {
+            // If neither guest nor authenticated, go to login
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }

@@ -105,11 +105,15 @@ class LoginActivity : AppCompatActivity() {
             auth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this) { task ->
                     if (task.isSuccessful) {
-                        // Handle guest data before proceeding
-                        handleGuestDataOnLogin()
-
-                        startActivity(Intent(this, MainActivity::class.java))
-                        finish()
+                        // Check if coming from guest mode
+                        val guestSession = GuestSession.getInstance(this)
+                        if (guestSession.isGuestSession()) {
+                            handleGuestDataOnLogin()
+                        } else {
+                            // Direct login without guest data
+                            startActivity(Intent(this, MainActivity::class.java))
+                            finish()
+                        }
                     } else {
                         Toast.makeText(this, "Authentication failed", Toast.LENGTH_SHORT).show()
                     }
@@ -200,25 +204,29 @@ class LoginActivity : AppCompatActivity() {
 
     private fun handleGuestDataOnLogin() {
         val guestSession = GuestSession.getInstance(this)
-        if (guestSession.isGuestSession()) {
-            // Show dialog to user
-            AlertDialog.Builder(this)
-                .setTitle(R.string.guest_data_found)
-                .setMessage(R.string.convert_guest_data_message)
-                .setPositiveButton(R.string.convert) { _, _ ->
-                    // Convert guest data to user data
-                    guestSession.getGuestId()?.let { guestId ->
-                        auth.currentUser?.uid?.let { userId ->
-                            DataHandler.convertGuestNotesToUser(guestId, userId)
-                        }
+        // Show dialog to user
+        AlertDialog.Builder(this)
+            .setTitle(R.string.guest_data_found)
+            .setMessage(R.string.convert_guest_data_message)
+            .setPositiveButton(R.string.convert) { _, _ ->
+                // Convert guest data to user data
+                guestSession.getGuestId()?.let { guestId ->
+                    auth.currentUser?.uid?.let { userId ->
+                        DataHandler.convertGuestNotesToUser(guestId, userId)
                     }
-                    guestSession.endGuestSession()
                 }
-                .setNegativeButton(R.string.discard) { _, _ ->
-                    // Clear guest data
-                    guestSession.clearGuestData(this)
-                }
-                .show()
-        }
+                // End guest session after conversion
+                guestSession.endGuestSession()
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+            }
+            .setNegativeButton(R.string.discard) { _, _ ->
+                // Clear guest data
+                guestSession.clearGuestData(this)
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+            }
+            .setCancelable(false)
+            .show()
     }
 }

@@ -39,12 +39,16 @@ abstract class BaseNavigationActivity : AppCompatActivity(), NavigationView.OnNa
         val signUpButton = navigationView.findViewById<MaterialButton>(R.id.buttonSignUp)
 
         loginButton?.setOnClickListener {
+            // End guest session before navigating to login
+            GuestSession.getInstance(this).clearGuestData(this)
             drawerLayout.closeDrawer(GravityCompat.START)
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }
 
         signUpButton?.setOnClickListener {
+            // End guest session before navigating to signup
+            GuestSession.getInstance(this).clearGuestData(this)
             drawerLayout.closeDrawer(GravityCompat.START)
             startActivity(Intent(this, SignUpActivity::class.java))
             finish()

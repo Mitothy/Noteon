@@ -117,6 +117,11 @@ class AuthManager private constructor(private val context: Context) {
     suspend fun restoreNotes() {
         currentUser?.let { user ->
             try {
+                // First, clear any existing synced notes for this user
+                DataHandler.getAllNotes()
+                    .filter { it.userId == user.uid }
+                    .forEach { DataHandler.deleteNotePermanently(it.id) }
+
                 val notesSnapshot = database
                     .child("users")
                     .child(user.uid)
@@ -129,7 +134,7 @@ class AuthManager private constructor(private val context: Context) {
                         val noteMap = noteSnapshot.value as? Map<*, *>
                         if (noteMap != null) {
                             val note = Note(
-                                id = (noteMap["id"] as? Long) ?: 0L,
+                                id = 0L, // Let SQLite generate a new ID
                                 title = (noteMap["title"] as? String) ?: "",
                                 content = (noteMap["content"] as? String) ?: "",
                                 folderId = (noteMap["folderId"] as? Long) ?: 0L,
@@ -138,11 +143,15 @@ class AuthManager private constructor(private val context: Context) {
                                 userId = user.uid,
                                 isSynced = true
                             )
-                            DataHandler.addNoteFromSync(note)
+
+                            // Use addNoteFromSync to add the note to local database
+                            if (note.title.isNotEmpty()) {
+                                DataHandler.addNoteFromSync(note)
+                            }
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error restoring note: ${noteSnapshot.key}", e)
-                        continue // Now continue is inside a for loop, so it's valid
+                        continue
                     }
                 }
             } catch (e: Exception) {

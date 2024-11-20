@@ -102,23 +102,52 @@ class LoginActivity : AppCompatActivity() {
 
         if (validateForm(email, password)) {
             showProgressBar()
-            auth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener(this) { task ->
-                    hideProgressBar()
-                    if (task.isSuccessful) {
-                        val guestSession = GuestSession.getInstance(this)
-                        if (guestSession.isGuestSession() && hasGuestNotes()) {
-                            handleGuestDataOnLogin()
-                        } else {
-                            // No guest data or not in guest mode, proceed normally
-                            guestSession.endGuestSession() // Clean up any guest session state
-                            startActivity(Intent(this, MainActivity::class.java))
-                            finish()
+            lifecycleScope.launch {
+                try {
+                    auth.signInWithEmailAndPassword(email, password)
+                        .addOnCompleteListener(this@LoginActivity) { task ->
+                            if (task.isSuccessful) {
+                                // Restore notes in a coroutine
+                                lifecycleScope.launch {
+                                    try {
+                                        AuthManager.getInstance(this@LoginActivity).restoreNotes()
+
+                                        val guestSession = GuestSession.getInstance(this@LoginActivity)
+                                        if (guestSession.isGuestSession() && hasGuestNotes()) {
+                                            handleGuestDataOnLogin()
+                                        } else {
+                                            // No guest data or not in guest mode, proceed normally
+                                            guestSession.endGuestSession() // Clean up any guest session state
+                                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
+                                            finish()
+                                        }
+                                    } catch (e: Exception) {
+                                        hideProgressBar()
+                                        Toast.makeText(
+                                            this@LoginActivity,
+                                            "Error restoring notes: ${e.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            } else {
+                                hideProgressBar()
+                                Toast.makeText(
+                                    this@LoginActivity,
+                                    "Authentication failed",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
-                    } else {
-                        Toast.makeText(this, "Authentication failed", Toast.LENGTH_SHORT).show()
-                    }
+                } catch (e: Exception) {
+                    hideProgressBar()
+                    Toast.makeText(
+                        this@LoginActivity,
+                        "Error: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
+            }
         }
     }
 

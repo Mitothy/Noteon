@@ -1,15 +1,17 @@
 package com.example.noteon
 
 import android.content.Context
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.auth.GoogleAuthProvider
 
 class AuthManager private constructor(private val context: Context) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-    private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
+    private val database: DatabaseReference = FirebaseDatabase.getInstance().reference
     private val dbHelper: DatabaseHelper = DatabaseHelper(context)
 
     val currentUser: FirebaseUser?
@@ -39,6 +41,7 @@ class AuthManager private constructor(private val context: Context) {
 
             Result.success(result.user!!)
         } catch (e: Exception) {
+            Log.e(TAG, "Error signing in", e)
             Result.failure(e)
         }
     }
@@ -48,6 +51,7 @@ class AuthManager private constructor(private val context: Context) {
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             Result.success(result.user!!)
         } catch (e: Exception) {
+            Log.e(TAG, "Error signing up", e)
             Result.failure(e)
         }
     }
@@ -66,63 +70,84 @@ class AuthManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun backupNotes() {
+    suspend fun backupNotes(onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }) {
         currentUser?.let { user ->
-            val notes = DataHandler.getAllNotes()
-            notes.forEach { note ->
-                // Only backup non-deleted notes that belong to the authenticated user
-                if (!note.isDeleted && note.userId == user.uid) {
-                    // Create a map of note data
-                    val noteMap = hashMapOf(
-                        "id" to note.id,
-                        "title" to note.title,
-                        "content" to note.content,
-                        "folderId" to note.folderId,
-                        "isFavorite" to note.isFavorite,
-                        "timestamp" to note.timestamp,
-                        "userId" to user.uid
-                    )
+            try {
+                val notes = DataHandler.getAllNotes()
+                val totalNotes = notes.count { !it.isDeleted && it.userId == user.uid }
+                var currentNote = 0
 
-                    // Save to Firebase
-                    database.reference
-                        .child("users")
-                        .child(user.uid)
-                        .child("notes")
-                        .child(note.id.toString())
-                        .setValue(noteMap)
-                        .await()
+                notes.forEach { note ->
+                    if (!note.isDeleted && note.userId == user.uid) {
+                        try {
+                            val noteRef = database
+                                .child("users")
+                                .child(user.uid)
+                                .child("notes")
+                                .child(note.id.toString())
 
-                    // Mark note as synced
-                    DataHandler.markNoteAsSynced(note.id, user.uid)
+                            val noteMap = hashMapOf(
+                                "id" to note.id,
+                                "title" to note.title,
+                                "content" to note.content,
+                                "folderId" to note.folderId,
+                                "isFavorite" to note.isFavorite,
+                                "timestamp" to note.timestamp,
+                                "userId" to user.uid
+                            )
+
+                            noteRef.setValue(noteMap).await()
+                            DataHandler.markNoteAsSynced(note.id, user.uid)
+
+                            currentNote++
+                            onProgress(currentNote, totalNotes)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error backing up note ${note.id}", e)
+                            throw e
+                        }
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during backup", e)
+                throw e
             }
         }
     }
 
     suspend fun restoreNotes() {
         currentUser?.let { user ->
-            val snapshot = database.reference
-                .child("users")
-                .child(user.uid)
-                .child("notes")
-                .get()
-                .await()
+            try {
+                val notesSnapshot = database
+                    .child("users")
+                    .child(user.uid)
+                    .child("notes")
+                    .get()
+                    .await()
 
-            snapshot.children.forEach { noteSnapshot ->
-                val noteMap = noteSnapshot.value as? Map<*, *>
-                if (noteMap != null) {
-                    val note = Note(
-                        id = (noteMap["id"] as? Long) ?: 0L,
-                        title = (noteMap["title"] as? String) ?: "",
-                        content = (noteMap["content"] as? String) ?: "",
-                        folderId = (noteMap["folderId"] as? Long) ?: 0L,
-                        isFavorite = (noteMap["isFavorite"] as? Boolean) ?: false,
-                        timestamp = (noteMap["timestamp"] as? Long) ?: System.currentTimeMillis(),
-                        userId = user.uid,
-                        isSynced = true
-                    )
-                    DataHandler.addNoteFromSync(note)
+                for (noteSnapshot in notesSnapshot.children) {
+                    try {
+                        val noteMap = noteSnapshot.value as? Map<*, *>
+                        if (noteMap != null) {
+                            val note = Note(
+                                id = (noteMap["id"] as? Long) ?: 0L,
+                                title = (noteMap["title"] as? String) ?: "",
+                                content = (noteMap["content"] as? String) ?: "",
+                                folderId = (noteMap["folderId"] as? Long) ?: 0L,
+                                isFavorite = (noteMap["isFavorite"] as? Boolean) ?: false,
+                                timestamp = (noteMap["timestamp"] as? Long) ?: System.currentTimeMillis(),
+                                userId = user.uid,
+                                isSynced = true
+                            )
+                            DataHandler.addNoteFromSync(note)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error restoring note: ${noteSnapshot.key}", e)
+                        continue // Now continue is inside a for loop, so it's valid
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error restoring notes", e)
+                throw e
             }
         }
     }

@@ -1,11 +1,13 @@
 package com.example.noteon
 
+import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
@@ -16,7 +18,6 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.launch
@@ -219,13 +220,29 @@ class MainActivity : BaseNavigationActivity() {
             return
         }
 
+        val progressDialog = Dialog(this).apply {
+            setContentView(R.layout.dialog_progress)
+            setCancelable(false)
+        }
+
+        // Get dialog views
+        val progressBar = progressDialog.findViewById<ProgressBar>(R.id.progressBar)
+        val textViewPercentage = progressDialog.findViewById<TextView>(R.id.textViewPercentage)
+
         lifecycleScope.launch {
             try {
-                Toast.makeText(this@MainActivity, R.string.sync_in_progress, Toast.LENGTH_SHORT).show()
-                authManager.backupNotes()
+                progressDialog.show()
+                authManager.backupNotes { current, total ->
+                    progressBar.max = total
+                    progressBar.progress = current
+                    val percentage = ((current.toFloat() / total) * 100).toInt()
+                    textViewPercentage.text = "$percentage%"
+                }
                 Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, R.string.sync_error, Toast.LENGTH_SHORT).show()
+            } finally {
+                progressDialog.dismiss()
             }
         }
     }

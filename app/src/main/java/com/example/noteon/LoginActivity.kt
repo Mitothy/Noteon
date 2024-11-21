@@ -110,22 +110,28 @@ class LoginActivity : AppCompatActivity() {
                                 // Restore notes in a coroutine
                                 lifecycleScope.launch {
                                     try {
-                                        AuthManager.getInstance(this@LoginActivity).restoreNotes()
+                                        val authManager = AuthManager.getInstance(this@LoginActivity)
+
+                                        // First restore folders to ensure proper hierarchy
+                                        authManager.restoreFolders()
+
+                                        // Then restore notes
+                                        authManager.restoreNotes()
 
                                         val guestSession = GuestSession.getInstance(this@LoginActivity)
                                         if (guestSession.isGuestSession() && hasGuestNotes()) {
                                             handleGuestDataOnLogin()
                                         } else {
-                                            // No guest data or not in guest mode, proceed normally
-                                            guestSession.endGuestSession() // Clean up any guest session state
+                                            guestSession.endGuestSession()
                                             startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                                             finish()
                                         }
                                     } catch (e: Exception) {
+                                        Log.e("LoginActivity", "Error during sync: ${e.message}", e)
                                         hideProgressBar()
                                         Toast.makeText(
                                             this@LoginActivity,
-                                            "Error restoring notes: ${e.message}",
+                                            "Error syncing data: ${e.message}",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }

@@ -10,8 +10,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         private const val DATABASE_NAME = "noteon.db"
-        private const val DATABASE_VERSION = 2  // Increment version number
-
+        private const val DATABASE_VERSION = 3
         // Table Names
         private const val TABLE_NOTES = "notes"
         private const val TABLE_FOLDERS = "folders"
@@ -55,7 +54,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 $KEY_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 $KEY_NAME TEXT NOT NULL,
                 $KEY_DESCRIPTION TEXT,
-                $KEY_TIMESTAMP INTEGER NOT NULL
+                $KEY_TIMESTAMP INTEGER NOT NULL,
+                $KEY_USER_ID TEXT,
+                $KEY_IS_SYNCED INTEGER DEFAULT 0
             )
         """
     }
@@ -70,6 +71,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             // Add new columns for Firebase sync
             db.execSQL("ALTER TABLE $TABLE_NOTES ADD COLUMN $KEY_IS_SYNCED INTEGER DEFAULT 0")
             db.execSQL("ALTER TABLE $TABLE_NOTES ADD COLUMN $KEY_USER_ID TEXT")
+        }
+        if (oldVersion < 3) {
+            // Add new columns for folders
+            db.execSQL("ALTER TABLE $TABLE_FOLDERS ADD COLUMN $KEY_USER_ID TEXT")
+            db.execSQL("ALTER TABLE $TABLE_FOLDERS ADD COLUMN $KEY_IS_SYNCED INTEGER DEFAULT 0")
         }
     }
 
@@ -292,6 +298,8 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put(KEY_NAME, folder.name)
             put(KEY_DESCRIPTION, folder.description)
             put(KEY_TIMESTAMP, folder.timestamp)
+            put(KEY_USER_ID, folder.userId)
+            put(KEY_IS_SYNCED, if (folder.isSynced) 1 else 0)
         }
         return db.insert(TABLE_FOLDERS, null, values)
     }
@@ -311,7 +319,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                 id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
                 name = cursor.getString(cursor.getColumnIndexOrThrow(KEY_NAME)),
                 description = cursor.getString(cursor.getColumnIndexOrThrow(KEY_DESCRIPTION)),
-                timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP))
+                timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)),
+                userId = cursor.getString(cursor.getColumnIndexOrThrow(KEY_USER_ID)),
+                isSynced = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_SYNCED)) == 1
             )
         } else null.also { cursor.close() }
     }
@@ -327,7 +337,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
                     name = cursor.getString(cursor.getColumnIndexOrThrow(KEY_NAME)),
                     description = cursor.getString(cursor.getColumnIndexOrThrow(KEY_DESCRIPTION)),
-                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP))
+                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)),
+                    userId = cursor.getString(cursor.getColumnIndexOrThrow(KEY_USER_ID)),
+                    isSynced = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_SYNCED)) == 1
                 ))
             } while (cursor.moveToNext())
         }
@@ -335,15 +347,17 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return folders
     }
 
+
     fun updateFolder(folder: Folder): Int {
         val db = this.writableDatabase
         val values = ContentValues().apply {
             put(KEY_NAME, folder.name)
             put(KEY_DESCRIPTION, folder.description)
+            put(KEY_USER_ID, folder.userId)
+            put(KEY_IS_SYNCED, if (folder.isSynced) 1 else 0)
         }
         return db.update(TABLE_FOLDERS, values, "$KEY_ID = ?", arrayOf(folder.id.toString()))
     }
-
     fun deleteFolder(folderId: Long): Int {
         val db = this.writableDatabase
         // First, update all notes in this folder to have no folder (folderId = 0)
@@ -380,6 +394,53 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         cursor.close()
         return folders
+    }
+
+    fun getFoldersByUserId(userId: String?): List<Folder> {
+        val folders = mutableListOf<Folder>()
+        val db = this.readableDatabase
+        val cursor = db.query(
+            TABLE_FOLDERS,
+            null,
+            "$KEY_USER_ID = ?",
+            arrayOf(userId),
+            null, null,
+            "$KEY_NAME ASC"
+        )
+
+        if (cursor.moveToFirst()) {
+            do {
+                folders.add(Folder(
+                    id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
+                    name = cursor.getString(cursor.getColumnIndexOrThrow(KEY_NAME)),
+                    description = cursor.getString(cursor.getColumnIndexOrThrow(KEY_DESCRIPTION)),
+                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)),
+                    userId = userId,
+                    isSynced = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_SYNCED)) == 1
+                ))
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return folders
+    }
+
+    fun upsertSyncedFolder(folder: Folder): Long {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(KEY_ID, folder.id)
+            put(KEY_NAME, folder.name)
+            put(KEY_DESCRIPTION, folder.description)
+            put(KEY_TIMESTAMP, folder.timestamp)
+            put(KEY_USER_ID, folder.userId)
+            put(KEY_IS_SYNCED, 1) // Mark as synced
+        }
+
+        return db.insertWithOnConflict(
+            TABLE_FOLDERS,
+            null,
+            values,
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
     }
 
     fun emptyTrash() {

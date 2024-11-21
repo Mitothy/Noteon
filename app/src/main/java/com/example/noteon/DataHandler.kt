@@ -49,20 +49,25 @@ object DataHandler {
     }
 
     fun clearGuestData(guestId: String) {
-        // Get all notes for the guest user
-        val guestNotes = getAllNotes().filter { it.userId == guestId }
-
-        // Delete each guest note
-        guestNotes.forEach { note ->
+        // ONLY clear notes and folders associated with this specific guest ID
+        getAllNotes().filter { it.userId == guestId }.forEach { note ->
             deleteNotePermanently(note.id)
         }
 
-        // Also delete any folders created by guest
-        getAllFolders().forEach { folder ->
-            // Since folders don't have userId, we'll delete empty folders
-            if (getNotesInFolder(folder.id).isEmpty()) {
-                deleteFolder(folder.id)
-            }
+        getAllFolders().filter { it.userId == guestId }.forEach { folder ->
+            deleteFolder(folder.id)
+        }
+    }
+
+    fun clearUserData(userId: String) {
+        // Clear all notes for this user
+        getAllNotes().filter { it.userId == userId }.forEach { note ->
+            deleteNotePermanently(note.id)
+        }
+
+        // Clear all folders for this user
+        getAllFolders().filter { it.userId == userId }.forEach { folder ->
+            deleteFolder(folder.id)
         }
     }
 
@@ -158,16 +163,40 @@ object DataHandler {
         dbHelper.emptyTrash()
     }
 
-    // Folder operations
-    fun createFolder(name: String, description: String): Folder {
+    fun createFolder(name: String, description: String, context: Context): Folder {
+        val authManager = AuthManager.getInstance(context)
+        val guestSession = GuestSession.getInstance(context)
+
+        val userId = if (guestSession.isGuestSession()) {
+            guestSession.getGuestId()
+        } else {
+            authManager.currentUser?.uid
+        }
+
         val folder = Folder(
-            id = 0, // SQLite will auto-generate the ID
+            id = 0,
             name = name,
-            description = description
+            description = description,
+            userId = userId   // Store the userId with the folder
         )
         val id = dbHelper.addFolder(folder)
         return folder.copy(id = id)
     }
+
+    fun getFoldersByUser(context: Context): List<Folder> {
+        val authManager = AuthManager.getInstance(context)
+        val guestSession = GuestSession.getInstance(context)
+
+        val currentUserId = if (guestSession.isGuestSession()) {
+            guestSession.getGuestId()
+        } else {
+            authManager.currentUser?.uid
+        }
+
+        // Only return folders for the current user
+        return dbHelper.getAllFolders().filter { it.userId == currentUserId }
+    }
+
 
     fun getAllFolders(): List<Folder> = dbHelper.getAllFolders()
 
@@ -196,6 +225,22 @@ object DataHandler {
 
     fun searchFolders(query: String): List<Folder> = dbHelper.searchFolders(query)
 
+    fun addFolderFromSync(folder: Folder): Folder {
+        val id = dbHelper.upsertSyncedFolder(folder)
+        return folder.copy(id = id)
+    }
+
+
+    fun markFolderAsSynced(folderId: Long, userId: String) {
+        getFolderById(folderId)?.let { folder ->
+            val updatedFolder = folder.copy(
+                isSynced = true,
+                userId = userId
+            )
+            dbHelper.updateFolder(updatedFolder)
+        }
+    }
+
     fun markNoteAsSynced(noteId: Long, userId: String) {
         getNoteById(noteId)?.let { note ->
             val updatedNote = note.copy(isSynced = true, userId = userId)
@@ -212,4 +257,6 @@ object DataHandler {
     fun getUserName(userId: String): String? {
         return usersMap[userId]?.name
     }
+
+
 }

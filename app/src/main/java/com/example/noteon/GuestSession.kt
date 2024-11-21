@@ -43,15 +43,25 @@ class GuestSession private constructor(context: Context) {
         } else null
     }
 
-    fun clearGuestData(context: Context) {
-        // Clear guest notes from the database
-        getGuestId()?.let { guestId ->
-            DataHandler.clearGuestData(guestId)
-        }
-        endGuestSession()
+    fun hasGuestData(context: Context): Boolean {
+        val guestId = getGuestId()
+        return guestId?.let { id ->
+            DataHandler.getAllNotes().any { it.userId == id } ||
+                    DataHandler.getAllFolders().any { it.userId == id }
+        } ?: false
     }
 
     fun isGuestSession(): Boolean {
         return prefs.getBoolean(KEY_IS_GUEST, false)
+    }
+
+    fun clearGuestData(context: Context) {
+        // Get the guest ID
+        getGuestId()?.let { guestId ->
+            // Clear data using DataHandler
+            DataHandler.clearUserData(guestId)
+        }
+        // End the guest session
+        endGuestSession()
     }
 }

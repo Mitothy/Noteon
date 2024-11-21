@@ -225,19 +225,28 @@ class MainActivity : BaseNavigationActivity() {
             setCancelable(false)
         }
 
-        // Get dialog views
         val progressBar = progressDialog.findViewById<ProgressBar>(R.id.progressBar)
         val textViewPercentage = progressDialog.findViewById<TextView>(R.id.textViewPercentage)
+        val textViewProgress = progressDialog.findViewById<TextView>(R.id.textViewProgress)
 
         lifecycleScope.launch {
             try {
                 progressDialog.show()
+
+                // First sync folders
+                textViewProgress.text = "Syncing folders..."
+                authManager.backupFolders()
+                authManager.restoreFolders()
+
+                // Then sync notes
+                textViewProgress.text = getString(R.string.sync_in_progress)
                 authManager.backupNotes { current, total ->
                     progressBar.max = total
                     progressBar.progress = current
                     val percentage = ((current.toFloat() / total) * 100).toInt()
                     textViewPercentage.text = "$percentage%"
                 }
+
                 Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, R.string.sync_error, Toast.LENGTH_SHORT).show()

@@ -59,7 +59,7 @@ class FolderActivity : BaseNavigationActivity() {
 
     private fun setupRecyclerView() {
         folderAdapter = FolderAdapter(
-            folders = DataHandler.getAllFolders(),
+            folders = DataHandler.getFoldersByUser(this),  // Use getFoldersByUser instead of getAllFolders
             onFolderClick = { folder ->
                 val intent = MainActivity.createIntent(this, folder.id)
                 startActivity(intent)
@@ -67,7 +67,7 @@ class FolderActivity : BaseNavigationActivity() {
             },
             onFolderOptions = { folder ->
                 FolderOptionsDialog(this).show(folder) {
-                    folderAdapter.updateFolders(DataHandler.getAllFolders())
+                    folderAdapter.updateFolders(DataHandler.getFoldersByUser(this))  // Update here too
                 }
             }
         )
@@ -101,7 +101,11 @@ class FolderActivity : BaseNavigationActivity() {
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 if (newText != null) {
+                    // Only search within current user's folders
                     val filteredFolders = DataHandler.searchFolders(newText)
+                        .filter { folder -> folder.userId == (if (guestSession.isGuestSession())
+                            guestSession.getGuestId()
+                        else authManager.currentUser?.uid) }
                     folderAdapter.updateFolders(filteredFolders)
                 }
                 return true
@@ -121,8 +125,8 @@ class FolderActivity : BaseNavigationActivity() {
                 val folderName = editTextFolderName.text.toString().trim()
                 val folderDescription = editTextFolderDescription.text.toString().trim()
                 if (folderName.isNotEmpty()) {
-                    DataHandler.createFolder(folderName, folderDescription)
-                    folderAdapter.updateFolders(DataHandler.getAllFolders())
+                    DataHandler.createFolder(folderName, folderDescription, this)
+                    folderAdapter.updateFolders(DataHandler.getFoldersByUser(this))
                 }
             }
             .setNegativeButton(R.string.cancel, null)

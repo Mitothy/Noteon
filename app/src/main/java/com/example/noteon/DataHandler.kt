@@ -156,7 +156,15 @@ object DataHandler {
     fun getTrashNotes(): List<Note> = dbHelper.getTrashNotes()
 
     fun deleteNotePermanently(noteId: Long) {
-        dbHelper.deleteNote(noteId)
+        // First check if note exists
+        getNoteById(noteId)?.let { note ->
+            // Remove from folder if it's in one
+            if (note.folderId != 0L) {
+                moveNoteToFolder(noteId, 0)
+            }
+            // Delete the note
+            dbHelper.deleteNote(noteId)
+        }
     }
 
     fun emptyTrash() {
@@ -213,6 +221,15 @@ object DataHandler {
     }
 
     fun deleteFolder(folderId: Long) {
+        // First get all notes in this folder
+        val notesInFolder = getNotesInFolder(folderId)
+
+        // Move all notes to root (folderId = 0)
+        notesInFolder.forEach { note ->
+            moveNoteToFolder(note.id, 0)
+        }
+
+        // Delete the folder
         dbHelper.deleteFolder(folderId)
     }
 

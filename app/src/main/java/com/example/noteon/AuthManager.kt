@@ -73,6 +73,7 @@ class AuthManager private constructor(private val context: Context) {
         }
     }
 
+
     suspend fun backupNotes(onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }) {
         currentUser?.let { user ->
             try {
@@ -127,12 +128,10 @@ class AuthManager private constructor(private val context: Context) {
                     .get()
                     .await()
 
-                // Get all server note IDs first
                 val serverNoteIds = notesSnapshot.children
                     .mapNotNull { (it.value as? Map<*, *>)?.get("id") as? Long }
                     .toSet()
 
-                // Delete local notes that don't exist on server
                 val localNotes = DataHandler.getAllNotes()
                     .filter { it.userId == user.uid && it.isSynced }
 
@@ -142,13 +141,17 @@ class AuthManager private constructor(private val context: Context) {
                     }
                 }
 
-                // Now process server notes
-                for (noteSnapshot in notesSnapshot.children) {
+                notesSnapshot.children.forEach { noteSnapshot ->
                     try {
                         val noteMap = noteSnapshot.value as? Map<*, *>
                         if (noteMap != null) {
+                            val noteId = (noteMap["id"] as? Long)
+                            if (noteId == null) {
+                                return@forEach
+                            }
+
                             val note = Note(
-                                id = (noteMap["id"] as? Long) ?: continue,
+                                id = noteId,
                                 title = (noteMap["title"] as? String) ?: "",
                                 content = (noteMap["content"] as? String) ?: "",
                                 folderId = (noteMap["folderId"] as? Long) ?: 0L,
@@ -165,7 +168,7 @@ class AuthManager private constructor(private val context: Context) {
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error restoring note: ${noteSnapshot.key}", e)
-                        continue
+                        return@forEach
                     }
                 }
             } catch (e: Exception) {
@@ -178,94 +181,75 @@ class AuthManager private constructor(private val context: Context) {
     suspend fun backupFolders() {
         currentUser?.let { user ->
             try {
-                val folders = DataHandler.getFoldersByUser(context)
-
-                folders.forEach { folder ->
-                    // Only backup non-synced folders that belong to the authenticated user
-                    if (!folder.isSynced && folder.userId == user.uid) {
-                        val folderRef = database
-                            .child("users")
-                            .child(user.uid)
-                            .child("folders")
-                            .child(folder.id.toString())
-
-                        val folderMap = hashMapOf(
-                            "id" to folder.id,
-                            "name" to folder.name,
-                            "description" to folder.description,
-                            "timestamp" to folder.timestamp,
-                            "userId" to user.uid
-                        )
-
-                        folderRef.setValue(folderMap).await()
-                        DataHandler.markFolderAsSynced(folder.id, user.uid)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during folder backup", e)
-                throw e
-            }
-        }
-    }
-
-    suspend fun restoreFolders() {
-        Log.d(TAG, "Starting folder restoration")
-        currentUser?.let { user ->
-            try {
-                // Get reference to user's folders in Firebase
+                // Get reference to all folders for this user
                 val userFoldersRef = database
                     .child("users")
                     .child(user.uid)
                     .child("folders")
 
-                // Get the snapshot of all folders
+                // Get current folders in Firebase
                 val foldersSnapshot = userFoldersRef.get().await()
 
-                // Create a map of server folder IDs and their data
-                Log.d(TAG, "Retrieved folders snapshot: ${foldersSnapshot.value}")
-                val serverFolders = mutableMapOf<Long, Map<String, Any>>()
-                foldersSnapshot.children.forEach { folderSnapshot ->
-                    val folderMap = folderSnapshot.value as? Map<*, *>
-                    val folderId = (folderMap?.get("id") as? Number)?.toLong()
-                    if (folderId != null) {
-                        @Suppress("UNCHECKED_CAST")
-                        serverFolders[folderId] = folderMap as Map<String, Any>
+                // Get all folder IDs that exist in Firebase
+                val firebaseFolderIds = foldersSnapshot.children.mapNotNull {
+                    it.child("id").getValue(Long::class.java)
+                }.toSet()
+
+                // Get all local folder IDs
+                val localFolderIds = DataHandler.getFoldersByUser(context)
+                    .map { it.id }
+                    .toSet()
+
+                // Delete folders from Firebase that don't exist locally
+                firebaseFolderIds.forEach { folderId ->
+                    if (folderId !in localFolderIds) {
+                        userFoldersRef.child(folderId.toString())
+                            .removeValue()
+                            .await()
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing folder deletions", e)
+                throw e
+            }
+        }
+    }
 
-                // Get local folders for this user
-                val localFolders = DataHandler.getFoldersByUser(context)
-                    .filter { it.userId == user.uid }
-                    .associateBy { it.id }
 
-                // Process each server folder
-                serverFolders.forEach { (folderId, folderData) ->
+    suspend fun restoreFolders() {
+        currentUser?.let { user ->
+            try {
+                // Clear all synced folders first
+                DataHandler.clearSyncedFolders(user.uid)
+
+                val foldersSnapshot = database
+                    .child("users")
+                    .child(user.uid)
+                    .child("folders")
+                    .get()
+                    .await()
+
+                // Only restore folders that exist on server
+                foldersSnapshot.children.forEach { folderSnapshot ->
                     try {
-                        val folder = Folder(
-                            id = folderId,
-                            name = folderData["name"] as? String ?: "",
-                            description = folderData["description"] as? String ?: "",
-                            timestamp = (folderData["timestamp"] as? Number)?.toLong()
-                                ?: System.currentTimeMillis(),
-                            userId = user.uid,
-                            isSynced = true
-                        )
-
-                        if (folder.name.isNotEmpty()) {
-                            DataHandler.addFolderFromSync(folder)
+                        val folderMap = folderSnapshot.value as? Map<*, *>
+                        if (folderMap != null) {
+                            val folder = Folder(
+                                id = (folderMap["id"] as? Long) ?: return@forEach,
+                                name = (folderMap["name"] as? String) ?: "",
+                                description = (folderMap["description"] as? String) ?: "",
+                                timestamp = (folderMap["timestamp"] as? Long) ?: System.currentTimeMillis(),
+                                userId = user.uid,
+                                isSynced = true
+                            )
+                            if (folder.name.isNotEmpty()) {
+                                DataHandler.addFolderFromSync(folder)
+                            }
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error restoring folder $folderId", e)
+                        Log.e(TAG, "Error restoring folder: ${folderSnapshot.key}", e)
                     }
                 }
-
-                // Remove local folders that don't exist on server
-                localFolders.forEach { (folderId, folder) ->
-                    if (!serverFolders.containsKey(folderId) && folder.isSynced) {
-                        DataHandler.deleteFolder(folderId)
-                    }
-                }
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error restoring folders", e)
                 throw e

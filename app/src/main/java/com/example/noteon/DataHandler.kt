@@ -2,12 +2,15 @@ package com.example.noteon
 
 import android.content.Context
 import android.util.Log
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 object DataHandler {
     private lateinit var dbHelper: DatabaseHelper
     private var usersMap = mutableMapOf<String, User>()
+    private val database = FirebaseDatabase.getInstance().reference
 
     // Initialize with context
     fun initialize(context: Context) {
@@ -15,14 +18,10 @@ object DataHandler {
     }
 
     fun storeUserInfo(user: User) {
-        // Store in local map
-        usersMap[user.id ?: ""] = user
-
-        // Store in Firebase
-        val db = FirebaseFirestore.getInstance()
-        db.collection("users")
-            .document(user.id ?: "")
-            .set(user)
+        usersMap[user.id] = user
+        database.child("users")
+            .child(user.id)
+            .setValue(user)
             .addOnSuccessListener {
                 Log.d("DataHandler", "User profile created successfully")
             }
@@ -114,7 +113,9 @@ object DataHandler {
         }
     }
 
-    fun getAllNotes(): List<Note> = dbHelper.getAllNotes()
+    fun getAllNotes(): List<Note> {
+        return dbHelper.getAllNotes().filter { !it.isDeleted }
+    }
 
     fun getNoteById(id: Long): Note? = dbHelper.getNoteById(id)
 
@@ -131,7 +132,9 @@ object DataHandler {
 
     fun getFavoriteNotes(): List<Note> = dbHelper.getFavoriteNotes()
 
-    fun getNotesInFolder(folderId: Long): List<Note> = dbHelper.getNotesInFolder(folderId)
+    fun getNotesInFolder(folderId: Long): List<Note> {
+        return dbHelper.getNotesInFolder(folderId).filter { !it.isDeleted }
+    }
 
     fun moveNoteToTrash(noteId: Long) {
         getNoteById(noteId)?.let { note ->
@@ -260,7 +263,10 @@ object DataHandler {
 
     fun markNoteAsSynced(noteId: Long, userId: String) {
         getNoteById(noteId)?.let { note ->
-            val updatedNote = note.copy(isSynced = true, userId = userId)
+            val updatedNote = note.copy(
+                isSynced = true,
+                userId = userId
+            )
             dbHelper.updateNote(updatedNote)
         }
     }
@@ -275,5 +281,81 @@ object DataHandler {
         return usersMap[userId]?.name
     }
 
+    fun deleteNoteWithSync(noteId: Long, context: Context) {
+        val authManager = AuthManager.getInstance(context)
+        val note = getNoteById(noteId)
+
+        if (note != null && authManager.currentUser?.uid == note.userId) {
+            database.child("users")
+                .child(authManager.currentUser!!.uid)
+                .child("notes")
+                .child(noteId.toString())
+                .removeValue()
+                .addOnSuccessListener {
+                    Log.d("DataHandler", "Note deleted from Firebase")
+                }
+                .addOnFailureListener { e ->
+                    Log.w("DataHandler", "Error deleting note from Firebase", e)
+                }
+        }
+
+        deleteNotePermanently(noteId)
+    }
+
+    fun emptyTrashWithSync(context: Context) {
+        val authManager = AuthManager.getInstance(context)
+        val trashNotes = getTrashNotes()
+
+        if (authManager.currentUser != null) {
+            trashNotes.forEach { note ->
+                if (note.userId == authManager.currentUser?.uid) {
+                    database.child("users")
+                        .child(authManager.currentUser!!.uid)
+                        .child("notes")
+                        .child(note.id.toString())
+                        .removeValue()
+                        .addOnSuccessListener {
+                            Log.d("DataHandler", "Note ${note.id} deleted from Firebase")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.w("DataHandler", "Error deleting note ${note.id} from Firebase", e)
+                        }
+                }
+            }
+        }
+
+        emptyTrash()
+    }
+
+    fun deleteFolderWithSync(folderId: Long, context: Context) {
+        val authManager = AuthManager.getInstance(context)
+        val folder = getFolderById(folderId)
+
+        if (folder != null && authManager.currentUser?.uid == folder.userId) {
+            // First delete locally
+            deleteFolder(folderId)
+
+            // Then remove from Firebase
+            database.child("users")
+                .child(authManager.currentUser!!.uid)
+                .child("folders")
+                .child(folderId.toString())
+                .removeValue()
+                .addOnFailureListener { e ->
+                    Log.e("DataHandler", "Failed to delete folder from Firebase: ${e.message}")
+                }
+        } else {
+            // If not synced or guest user, just delete locally
+            deleteFolder(folderId)
+        }
+    }
+
+    fun clearSyncedFolders(userId: String) {
+        getAllFolders()
+            .filter { it.userId == userId && it.isSynced }
+            .forEach { folder ->
+                deleteFolder(folder.id)
+            }
+    }
 
 }

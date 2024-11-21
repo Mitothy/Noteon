@@ -102,7 +102,7 @@ class TrashActivity : AppCompatActivity() {
             .setTitle(R.string.empty_trash)
             .setMessage(R.string.empty_trash_message)
             .setPositiveButton(R.string.empty_trash) { _, _ ->
-                DataHandler.emptyTrash()
+                DataHandler.emptyTrashWithSync(this)
                 loadTrashNotes()
             }
             .setNegativeButton(R.string.cancel, null)

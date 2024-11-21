@@ -39,12 +39,13 @@ class NoteOptionsDialog(private val context: Context) {
             .setTitle(R.string.delete_permanently)
             .setMessage(R.string.delete_permanently_message)
             .setPositiveButton(R.string.delete) { _, _ ->
-                DataHandler.deleteNotePermanently(note.id)
+                DataHandler.deleteNoteWithSync(note.id, context)
                 onUpdate()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
+
 
     private fun showNormalOptions(note: Note, onUpdate: () -> Unit) {
         val options = arrayOf(

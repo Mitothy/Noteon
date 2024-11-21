@@ -3,6 +3,7 @@ package com.example.noteon
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.database.Cursor
 import android.database.sqlite.SQLiteOpenHelper
 
 class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
@@ -76,6 +77,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     fun addNote(note: Note): Long {
         val db = this.writableDatabase
         val values = ContentValues().apply {
+            if (note.id != 0L) {
+                put(KEY_ID, note.id)  // Only set ID if it's not 0
+            }
             put(KEY_TITLE, note.title)
             put(KEY_CONTENT, note.content)
             put(KEY_FOLDER_ID, note.folderId)
@@ -86,24 +90,73 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put(KEY_IS_SYNCED, if (note.isSynced) 1 else 0)
             put(KEY_USER_ID, note.userId)
         }
-        return db.insert(TABLE_NOTES, null, values)
+
+        // If the note has an ID and already exists, update it instead
+        if (note.id != 0L && getNoteById(note.id) != null) {
+            db.update(TABLE_NOTES, values, "$KEY_ID = ?", arrayOf(note.id.toString()))
+            return note.id
+        }
+
+        return db.insertWithOnConflict(
+            TABLE_NOTES,
+            null,
+            values,
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
     }
+
 
     fun getAllNotes(): List<Note> {
         val notes = mutableListOf<Note>()
         val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_NOTES,
-            null,
-            "$KEY_IS_DELETED = 0",
-            null,
-            null, null,
-            "$KEY_TIMESTAMP DESC"
-        )
+        var cursor: Cursor? = null
 
-        if (cursor.moveToFirst()) {
-            do {
-                notes.add(Note(
+        try {
+            cursor = db.query(
+                TABLE_NOTES,
+                null,
+                null,
+                null,
+                null, null,
+                "$KEY_TIMESTAMP DESC"
+            )
+
+            if (cursor?.moveToFirst() == true) {
+                do {
+                    notes.add(Note(
+                        id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
+                        title = cursor.getString(cursor.getColumnIndexOrThrow(KEY_TITLE)),
+                        content = cursor.getString(cursor.getColumnIndexOrThrow(KEY_CONTENT)),
+                        folderId = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_FOLDER_ID)),
+                        isFavorite = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_FAVORITE)) == 1,
+                        isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_DELETED)) == 1,
+                        deletedDate = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_DELETED_DATE)),
+                        timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)),
+                        isSynced = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_SYNCED)) == 1,
+                        userId = cursor.getString(cursor.getColumnIndexOrThrow(KEY_USER_ID))
+                    ))
+                } while (cursor.moveToNext())
+            }
+        } finally {
+            cursor?.close()
+        }
+        return notes
+    }
+
+    fun getNoteById(id: Long): Note? {
+        val db = this.readableDatabase
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.query(
+                TABLE_NOTES,
+                null,
+                "$KEY_ID = ?",
+                arrayOf(id.toString()),
+                null, null, null
+            )
+
+            if (cursor?.moveToFirst() == true) {
+                Note(
                     id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
                     title = cursor.getString(cursor.getColumnIndexOrThrow(KEY_TITLE)),
                     content = cursor.getString(cursor.getColumnIndexOrThrow(KEY_CONTENT)),
@@ -114,35 +167,11 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
                     timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)),
                     isSynced = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_SYNCED)) == 1,
                     userId = cursor.getString(cursor.getColumnIndexOrThrow(KEY_USER_ID))
-                ))
-            } while (cursor.moveToNext())
+                )
+            } else null
+        } finally {
+            cursor?.close()
         }
-        cursor.close()
-        return notes
-    }
-
-    fun getNoteById(id: Long): Note? {
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_NOTES,
-            null,
-            "$KEY_ID = ?",
-            arrayOf(id.toString()),
-            null, null, null
-        )
-
-        return if (cursor.moveToFirst()) {
-            Note(
-                id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
-                title = cursor.getString(cursor.getColumnIndexOrThrow(KEY_TITLE)),
-                content = cursor.getString(cursor.getColumnIndexOrThrow(KEY_CONTENT)),
-                folderId = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_FOLDER_ID)),
-                isFavorite = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_FAVORITE)) == 1,
-                isDeleted = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_DELETED)) == 1,
-                deletedDate = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_DELETED_DATE)),
-                timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP))
-            )
-        } else null.also { cursor.close() }
     }
 
     fun updateNote(note: Note): Int {
@@ -154,9 +183,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put(KEY_IS_FAVORITE, if (note.isFavorite) 1 else 0)
             put(KEY_IS_DELETED, if (note.isDeleted) 1 else 0)
             put(KEY_DELETED_DATE, note.deletedDate)
+            put(KEY_TIMESTAMP, note.timestamp)
+            put(KEY_IS_SYNCED, if (note.isSynced) 1 else 0)
+            put(KEY_USER_ID, note.userId)
         }
         return db.update(TABLE_NOTES, values, "$KEY_ID = ?", arrayOf(note.id.toString()))
     }
+
+
 
     fun deleteNote(noteId: Long): Int {
         val db = this.writableDatabase
@@ -353,12 +387,26 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.delete(TABLE_NOTES, "$KEY_IS_DELETED = 1", null)
     }
 
-    fun updateNoteSync(noteId: Long, isSynced: Boolean, userId: String?) {
+    fun upsertSyncedNote(note: Note): Long {
         val db = this.writableDatabase
         val values = ContentValues().apply {
-            put(KEY_IS_SYNCED, if (isSynced) 1 else 0)
-            put(KEY_USER_ID, userId)
+            put(KEY_ID, note.id)
+            put(KEY_TITLE, note.title)
+            put(KEY_CONTENT, note.content)
+            put(KEY_FOLDER_ID, note.folderId)
+            put(KEY_IS_FAVORITE, if (note.isFavorite) 1 else 0)
+            put(KEY_IS_DELETED, if (note.isDeleted) 1 else 0)
+            put(KEY_DELETED_DATE, note.deletedDate)
+            put(KEY_TIMESTAMP, note.timestamp)
+            put(KEY_IS_SYNCED, true)
+            put(KEY_USER_ID, note.userId)
         }
-        db.update(TABLE_NOTES, values, "$KEY_ID = ?", arrayOf(noteId.toString()))
+
+        return db.insertWithOnConflict(
+            TABLE_NOTES,
+            null,
+            values,
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
     }
 }

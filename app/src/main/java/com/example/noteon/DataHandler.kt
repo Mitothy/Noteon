@@ -204,9 +204,10 @@ object DataHandler {
     }
 
     fun addNoteFromSync(note: Note): Note {
-        val id = dbHelper.addNote(note)
+        val id = dbHelper.upsertSyncedNote(note)
         return note.copy(id = id)
     }
+
 
     fun getUserName(userId: String): String? {
         return usersMap[userId]?.name

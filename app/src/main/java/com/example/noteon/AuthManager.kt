@@ -117,11 +117,6 @@ class AuthManager private constructor(private val context: Context) {
     suspend fun restoreNotes() {
         currentUser?.let { user ->
             try {
-                // First, clear any existing synced notes for this user
-                DataHandler.getAllNotes()
-                    .filter { it.userId == user.uid }
-                    .forEach { DataHandler.deleteNotePermanently(it.id) }
-
                 val notesSnapshot = database
                     .child("users")
                     .child(user.uid)
@@ -129,12 +124,28 @@ class AuthManager private constructor(private val context: Context) {
                     .get()
                     .await()
 
+                // Get all server note IDs first
+                val serverNoteIds = notesSnapshot.children
+                    .mapNotNull { (it.value as? Map<*, *>)?.get("id") as? Long }
+                    .toSet()
+
+                // Delete local notes that don't exist on server
+                val localNotes = DataHandler.getAllNotes()
+                    .filter { it.userId == user.uid && it.isSynced }
+
+                localNotes.forEach { note ->
+                    if (note.id !in serverNoteIds) {
+                        DataHandler.deleteNotePermanently(note.id)
+                    }
+                }
+
+                // Now process server notes
                 for (noteSnapshot in notesSnapshot.children) {
                     try {
                         val noteMap = noteSnapshot.value as? Map<*, *>
                         if (noteMap != null) {
                             val note = Note(
-                                id = 0L, // Let SQLite generate a new ID
+                                id = (noteMap["id"] as? Long) ?: continue,
                                 title = (noteMap["title"] as? String) ?: "",
                                 content = (noteMap["content"] as? String) ?: "",
                                 folderId = (noteMap["folderId"] as? Long) ?: 0L,
@@ -144,7 +155,6 @@ class AuthManager private constructor(private val context: Context) {
                                 isSynced = true
                             )
 
-                            // Use addNoteFromSync to add the note to local database
                             if (note.title.isNotEmpty()) {
                                 DataHandler.addNoteFromSync(note)
                             }

@@ -7,12 +7,10 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.auth.GoogleAuthProvider
 
 class AuthManager private constructor(private val context: Context) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val database: DatabaseReference = FirebaseDatabase.getInstance().reference
-    private val dbHelper: DatabaseHelper = DatabaseHelper(context)
 
     val currentUser: FirebaseUser?
         get() = auth.currentUser
@@ -30,32 +28,6 @@ class AuthManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun signInWithCredentials(email: String, password: String): Result<FirebaseUser> {
-        return try {
-            val result = auth.signInWithEmailAndPassword(email, password).await()
-
-            // After successful sign in, restore notes from Firebase
-            if (result.user != null) {
-                restoreNotes()
-            }
-
-            Result.success(result.user!!)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error signing in", e)
-            Result.failure(e)
-        }
-    }
-
-    suspend fun signUp(email: String, password: String): Result<FirebaseUser> {
-        return try {
-            val result = auth.createUserWithEmailAndPassword(email, password).await()
-            Result.success(result.user!!)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error signing up", e)
-            Result.failure(e)
-        }
-    }
-
     fun signOut() {
         // Clear data for current user before signing out
         currentUser?.let { user ->
@@ -63,16 +35,6 @@ class AuthManager private constructor(private val context: Context) {
         }
         auth.signOut()
     }
-
-    fun clearSyncedNotes() {
-        currentUser?.let { user ->
-            val notes = DataHandler.getAllNotes()
-            notes.filter { it.userId == user.uid }.forEach { note ->
-                DataHandler.deleteNotePermanently(note.id)
-            }
-        }
-    }
-
 
     suspend fun backupNotes(onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }) {
         currentUser?.let { user ->

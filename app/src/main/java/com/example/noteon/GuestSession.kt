@@ -43,14 +43,6 @@ class GuestSession private constructor(context: Context) {
         } else null
     }
 
-    fun hasGuestData(context: Context): Boolean {
-        val guestId = getGuestId()
-        return guestId?.let { id ->
-            DataHandler.getAllNotes().any { it.userId == id } ||
-                    DataHandler.getAllFolders().any { it.userId == id }
-        } ?: false
-    }
-
     fun isGuestSession(): Boolean {
         return prefs.getBoolean(KEY_IS_GUEST, false)
     }

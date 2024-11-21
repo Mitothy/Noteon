@@ -3,9 +3,6 @@ package com.example.noteon
 import android.content.Context
 import android.util.Log
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 object DataHandler {
     private lateinit var dbHelper: DatabaseHelper
@@ -67,41 +64,6 @@ object DataHandler {
         // Clear all folders for this user
         getAllFolders().filter { it.userId == userId }.forEach { folder ->
             deleteFolder(folder.id)
-        }
-    }
-
-    suspend fun backupNotes(context: Context) {
-        val authManager = AuthManager.getInstance(context)
-
-        authManager.currentUser?.let { user ->
-            val notes = getAllNotes()
-            notes.forEach { note ->
-                // Only backup non-deleted notes that belong to the authenticated user
-                if (!note.isDeleted && note.userId == user.uid) {
-                    // Create a map of note data
-                    val noteMap = hashMapOf(
-                        "id" to note.id,
-                        "title" to note.title,
-                        "content" to note.content,
-                        "folderId" to note.folderId,
-                        "isFavorite" to note.isFavorite,
-                        "timestamp" to note.timestamp,
-                        "userId" to user.uid
-                    )
-
-                    // Save to Firebase
-                    val db = FirebaseFirestore.getInstance()
-                    db.collection("users")
-                        .document(user.uid)
-                        .collection("notes")
-                        .document(note.id.toString())
-                        .set(noteMap)
-                        .await()
-
-                    // Mark note as synced
-                    markNoteAsSynced(note.id, user.uid)
-                }
-            }
         }
     }
 
@@ -248,17 +210,6 @@ object DataHandler {
     fun addFolderFromSync(folder: Folder): Folder {
         val id = dbHelper.upsertSyncedFolder(folder)
         return folder.copy(id = id)
-    }
-
-
-    fun markFolderAsSynced(folderId: Long, userId: String) {
-        getFolderById(folderId)?.let { folder ->
-            val updatedFolder = folder.copy(
-                isSynced = true,
-                userId = userId
-            )
-            dbHelper.updateFolder(updatedFolder)
-        }
     }
 
     fun markNoteAsSynced(noteId: Long, userId: String) {

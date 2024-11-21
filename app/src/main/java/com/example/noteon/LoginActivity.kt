@@ -1,26 +1,21 @@
 package com.example.noteon
 
-import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
 import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.tasks.Task
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
@@ -162,53 +157,6 @@ class LoginActivity : AppCompatActivity() {
         return guestId?.let { id ->
             DataHandler.getAllNotes().any { it.userId == id }
         } ?: false
-    }
-
-
-
-    private fun signInWithGoogle() {
-        val signInIntent = googleSignInClient.signInIntent
-        launcher.launch(signInIntent)
-    }
-
-    private val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            handleGoogleSignInResult(task)
-        }
-    }
-
-    private fun handleGoogleSignInResult(task: Task<GoogleSignInAccount>) {
-        if (task.isSuccessful) {
-            val account: GoogleSignInAccount? = task.result
-            if (account != null) {
-                updateUIWithGoogleAccount(account)
-            }
-        } else {
-            Toast.makeText(this, "Sign In Failed", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun updateUIWithGoogleAccount(account: GoogleSignInAccount) {
-        showProgressBar()
-        val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-        auth.signInWithCredential(credential).addOnCompleteListener {
-            if (it.isSuccessful) {
-                val user = User(
-                    id = auth.currentUser?.uid ?: "",
-                    name = account.displayName ?: "",
-                    email = account.email ?: ""
-                )
-                // Store user info in database
-                DataHandler.storeUserInfo(user)
-
-                startActivity(Intent(this, MainActivity::class.java))
-                finish()
-            } else {
-                Toast.makeText(this, "Sign In Failed", Toast.LENGTH_SHORT).show()
-            }
-            hideProgressBar()
-        }
     }
 
     private fun validateForm(email: String, password: String): Boolean {

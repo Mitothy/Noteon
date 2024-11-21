@@ -396,34 +396,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return folders
     }
 
-    fun getFoldersByUserId(userId: String?): List<Folder> {
-        val folders = mutableListOf<Folder>()
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_FOLDERS,
-            null,
-            "$KEY_USER_ID = ?",
-            arrayOf(userId),
-            null, null,
-            "$KEY_NAME ASC"
-        )
-
-        if (cursor.moveToFirst()) {
-            do {
-                folders.add(Folder(
-                    id = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_ID)),
-                    name = cursor.getString(cursor.getColumnIndexOrThrow(KEY_NAME)),
-                    description = cursor.getString(cursor.getColumnIndexOrThrow(KEY_DESCRIPTION)),
-                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)),
-                    userId = userId,
-                    isSynced = cursor.getInt(cursor.getColumnIndexOrThrow(KEY_IS_SYNCED)) == 1
-                ))
-            } while (cursor.moveToNext())
-        }
-        cursor.close()
-        return folders
-    }
-
     fun upsertSyncedFolder(folder: Folder): Long {
         val db = writableDatabase
         val values = ContentValues().apply {

@@ -65,6 +65,7 @@
         app:menu="@menu/drawer_menu">
 
         <include
+            android:id="@+id/nav_footer_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"

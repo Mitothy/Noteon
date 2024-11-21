@@ -12,6 +12,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
+import android.widget.TextView
+import android.view.View
 
 class FolderActivity : BaseNavigationActivity() {
     private lateinit var navigationView: NavigationView
@@ -21,6 +23,8 @@ class FolderActivity : BaseNavigationActivity() {
     private lateinit var searchView: SearchView
     override lateinit var drawerLayout: DrawerLayout
     private lateinit var toolbar: Toolbar
+    private lateinit var authManager: AuthManager
+    private lateinit var guestSession: GuestSession
 
     override val currentNavigationItem: Int = R.id.nav_folders
 
@@ -28,12 +32,17 @@ class FolderActivity : BaseNavigationActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_folders)
 
+        // Initialize managers
+        authManager = AuthManager.getInstance(this)
+        guestSession = GuestSession.getInstance(this)
+
         setupViews()
         setupToolbar()
         setupRecyclerView()
         setupFab()
         setupSearchView()
         setupNavigationFooter()
+        updateNavigationHeader()
 
         navigationView = findViewById(R.id.navigationView)
         navigationView.setNavigationItemSelectedListener(this)
@@ -118,5 +127,39 @@ class FolderActivity : BaseNavigationActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun updateNavigationHeader() {
+        val navigationView = findViewById<NavigationView>(R.id.navigationView)
+        val headerView = navigationView.getHeaderView(0)
+        val footerContainer = navigationView.findViewById<View>(R.id.nav_footer_container)
+        val usernameTextView = headerView.findViewById<TextView>(R.id.nav_header_username)
+        val emailTextView = headerView.findViewById<TextView>(R.id.nav_header_email)
+
+        when {
+            authManager.currentUser != null -> {
+                // User is logged in
+                footerContainer?.visibility = View.GONE
+                val userName = DataHandler.getUserName(authManager.currentUser!!.uid)
+                if (userName != null) {
+                    usernameTextView?.text = userName
+                } else {
+                    usernameTextView?.text = authManager.currentUser!!.email?.substringBefore('@')?.capitalize()
+                }
+                emailTextView?.text = authManager.currentUser!!.email
+            }
+            guestSession.isGuestSession() -> {
+                // User is in guest mode
+                footerContainer?.visibility = View.VISIBLE
+                usernameTextView?.text = getString(R.string.app_name)
+                emailTextView?.text = getString(R.string.guest_user)
+            }
+            else -> {
+                // Not logged in and not in guest mode
+                footerContainer?.visibility = View.VISIBLE
+                usernameTextView?.text = getString(R.string.app_name)
+                emailTextView?.text = getString(R.string.guest_user)
+            }
+        }
     }
 }

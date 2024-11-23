@@ -13,7 +13,8 @@ class NotesAdapter(
     private var notes: List<Note>,
     private val coroutineScope: CoroutineScope,
     private val onNoteClick: (Note) -> Unit,
-    private val onAIOptions: (Note) -> Unit
+    private val onAIOptions: (Note) -> Unit,
+    private val isTrashView: Boolean = false
 ) : RecyclerView.Adapter<NotesAdapter.NoteViewHolder>() {
 
     inner class NoteViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -25,7 +26,7 @@ class NotesAdapter(
         fun bind(note: Note) {
             textViewTitle.text = buildSpannedString {
                 append(note.title)
-                if (note.isFavorite) {
+                if (note.isFavorite && !isTrashView) {
                     append(" ★")
                 }
             }
@@ -33,10 +34,12 @@ class NotesAdapter(
 
             itemView.setOnClickListener { onNoteClick(note) }
             buttonOptions.setOnClickListener {
-                NoteOptionsDialog(itemView.context, coroutineScope).show(note) {
+                NoteOptionsDialog(itemView.context, coroutineScope).show(note, isTrashView) {
                     notifyDataSetChanged()
                 }
             }
+            // Hide AI options in trash view
+            buttonAIOptions.visibility = if (isTrashView) View.GONE else View.VISIBLE
             buttonAIOptions.setOnClickListener { onAIOptions(note) }
         }
     }

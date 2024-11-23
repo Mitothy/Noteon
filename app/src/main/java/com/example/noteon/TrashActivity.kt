@@ -37,7 +37,8 @@ class TrashActivity : AppCompatActivity() {
             notes = emptyList(),
             onNoteClick = { note -> showRestoreDialog(note) },
             coroutineScope = lifecycleScope,
-            onAIOptions = { note -> AIOptionsDialog(this).show(note) }
+            onAIOptions = { note -> AIOptionsDialog(this).show(note) },
+            isTrashView = true
         )
         recyclerViewTrash.apply {
             layoutManager = LinearLayoutManager(this@TrashActivity)

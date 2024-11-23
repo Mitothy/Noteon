@@ -42,7 +42,7 @@
     <string name="restore_note">Restore Note</string>
     <string name="restore_note_message">Do you want to restore this note?</string>
     <string name="restore">Restore</string>
-    <string name="delete_permanently">Delete Permanently</string>
+    <string name="delete_permanently">Delete permanently</string>
     <string name="delete_permanently_message">This note will be permanently deleted. This action cannot be undone.</string>
     <string name="move_to_trash">Move to Trash</string>
     <string name="title_required">Title is required</string>

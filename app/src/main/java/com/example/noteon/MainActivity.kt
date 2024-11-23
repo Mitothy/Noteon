@@ -139,9 +139,8 @@ class MainActivity : BaseNavigationActivity() {
             notes = notes,
             onNoteClick = { note -> openNoteDetail(note.id) },
             coroutineScope = lifecycleScope,
-            onAIOptions = { note ->
-                AIOptionsDialog(this).show(note)
-            }
+            onAIOptions = { note -> AIOptionsDialog(this).show(note) },
+            isTrashView = currentView == ViewType.TRASH
         )
         recyclerViewNotes.layoutManager = LinearLayoutManager(this)
         recyclerViewNotes.adapter = notesAdapter

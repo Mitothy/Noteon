@@ -7,11 +7,12 @@ import android.widget.TextView
 import androidx.core.text.buildSpannedString
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.CoroutineScope
 
 class NotesAdapter(
     private var notes: List<Note>,
+    private val coroutineScope: CoroutineScope,
     private val onNoteClick: (Note) -> Unit,
-    private val onNoteOptions: (Note) -> Unit,
     private val onAIOptions: (Note) -> Unit
 ) : RecyclerView.Adapter<NotesAdapter.NoteViewHolder>() {
 
@@ -31,7 +32,11 @@ class NotesAdapter(
             textViewContent.text = note.content
 
             itemView.setOnClickListener { onNoteClick(note) }
-            buttonOptions.setOnClickListener { onNoteOptions(note) }
+            buttonOptions.setOnClickListener {
+                NoteOptionsDialog(itemView.context, coroutineScope).show(note) {
+                    notifyDataSetChanged()
+                }
+            }
             buttonAIOptions.setOnClickListener { onAIOptions(note) }
         }
     }

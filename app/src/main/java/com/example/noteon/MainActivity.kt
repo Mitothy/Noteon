@@ -138,14 +138,7 @@ class MainActivity : BaseNavigationActivity() {
         notesAdapter = NotesAdapter(
             notes = notes,
             onNoteClick = { note -> openNoteDetail(note.id) },
-            onNoteOptions = { note ->
-                NoteOptionsDialog(this).show(
-                    note = note,
-                    isTrashView = currentView == ViewType.TRASH
-                ) {
-                    updateNotesList()
-                }
-            },
+            coroutineScope = lifecycleScope,
             onAIOptions = { note ->
                 AIOptionsDialog(this).show(note)
             }

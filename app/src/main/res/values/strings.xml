@@ -115,4 +115,8 @@
     <string name="sync_percentage">%d%%</string>
     <string name="assistant_typing">Assistant is typing…</string>
     <string name="note_icon">Note Icon</string>
+    <string name="sorting_folders_description">Using AI to find the most relevant folders for your note…</string>
+    <string name="loading">Loading</string>
+    <string name="sorting_folders">Sorting folders by relevance…</string>
+    <string name="error_sorting_folders">Error sorting folders</string>
 </resources>

@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.widget.Button
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
@@ -36,10 +36,8 @@ class TrashActivity : AppCompatActivity() {
         trashAdapter = NotesAdapter(
             notes = emptyList(),
             onNoteClick = { note -> showRestoreDialog(note) },
-            onNoteOptions = { note -> showTrashOptions(note) },
-            onAIOptions = { note ->
-                AIOptionsDialog(this).show(note)
-            }
+            coroutineScope = lifecycleScope,
+            onAIOptions = { note -> AIOptionsDialog(this).show(note) }
         )
         recyclerViewTrash.apply {
             layoutManager = LinearLayoutManager(this@TrashActivity)
@@ -53,37 +51,6 @@ class TrashActivity : AppCompatActivity() {
             .setMessage(R.string.restore_note_message)
             .setPositiveButton(R.string.restore) { _, _ ->
                 DataHandler.restoreNoteFromTrash(note.id)
-                loadTrashNotes()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun showTrashOptions(note: Note) {
-        AlertDialog.Builder(this)
-            .setItems(arrayOf(
-                getString(R.string.restore),
-                getString(R.string.delete_permanently)
-            )) { _, which ->
-                when (which) {
-                    0 -> {
-                        DataHandler.restoreNoteFromTrash(note.id)
-                        loadTrashNotes()
-                    }
-                    1 -> {
-                        showDeletePermanentlyDialog(note)
-                    }
-                }
-            }
-            .show()
-    }
-
-    private fun showDeletePermanentlyDialog(note: Note) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.delete_permanently)
-            .setMessage(R.string.delete_permanently_message)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                DataHandler.deleteNotePermanently(note.id)
                 loadTrashNotes()
             }
             .setNegativeButton(R.string.cancel, null)

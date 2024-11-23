@@ -10,9 +10,11 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var toolbar: Toolbar
     private lateinit var switchIntelligentSearch: SwitchMaterial
     private lateinit var switchSmartCategorization: SwitchMaterial
+    private lateinit var preferencesManager: PreferencesManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        preferencesManager = PreferencesManager.getInstance(this)
         setContentView(R.layout.activity_settings)
 
         setupToolbar()
@@ -30,17 +32,17 @@ class SettingsActivity : AppCompatActivity() {
         switchIntelligentSearch = findViewById(R.id.switchIntelligentSearch)
         switchSmartCategorization = findViewById(R.id.switchSmartCategorization)
 
-        // Load saved preferences (to be implemented)
+        // Load saved preferences
         switchIntelligentSearch.isChecked = false
-        switchSmartCategorization.isChecked = false
+        switchSmartCategorization.isChecked = preferencesManager.isSmartCategorizationEnabled()
 
-        // Setup listeners (to be implemented)
+        // Setup listeners
         switchIntelligentSearch.setOnCheckedChangeListener { _, isChecked ->
             // TODO: Implement intelligent search toggle functionality
         }
 
         switchSmartCategorization.setOnCheckedChangeListener { _, isChecked ->
-            // TODO: Implement smart categorization toggle functionality
+            preferencesManager.setSmartCategorizationEnabled(isChecked)
         }
     }
 

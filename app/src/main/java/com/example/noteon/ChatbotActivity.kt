@@ -7,6 +7,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.widget.Toolbar
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class ChatbotActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
@@ -15,6 +17,7 @@ class ChatbotActivity : AppCompatActivity() {
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var toolbar: Toolbar
     private val messages = mutableListOf<ChatMessage>()
+    private val chatRepository = ChatRepository()
 
     private var noteId: Long = -1
     private var noteTitle: String? = null
@@ -43,8 +46,11 @@ class ChatbotActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSendButton()
 
-        // Add initial message based on mode
-        addInitialMessage()
+        // Start chat session and add initial message
+        lifecycleScope.launch {
+            chatRepository.startNewChat()
+            addInitialMessage()
+        }
     }
 
     private fun setupToolbar() {
@@ -54,7 +60,6 @@ class ChatbotActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setDisplayShowHomeEnabled(true)
 
-        // Set title based on mode
         val title = when {
             noteTitle != null -> getString(R.string.chatbot_note_title, noteTitle)
             else -> getString(R.string.chatbot)
@@ -72,7 +77,8 @@ class ChatbotActivity : AppCompatActivity() {
         chatAdapter = ChatAdapter(messages)
         recyclerView.apply {
             layoutManager = LinearLayoutManager(this@ChatbotActivity).apply {
-                stackFromEnd = true
+                stackFromEnd = false
+                reverseLayout = false
             }
             adapter = chatAdapter
         }
@@ -88,44 +94,111 @@ class ChatbotActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendMessage(message: String) {
-        // Add user message
-        messages.add(ChatMessage(message, true))
-        chatAdapter.notifyItemInserted(messages.size - 1)
+    private fun formatNotesContext(): String {
+        val allNotes = DataHandler.getAllNotes()
+            .filter { !it.isDeleted }
 
-        // Add chatbot response
-        val note = if (noteId != -1L) DataHandler.getNoteById(noteId) else null
-        val response = when {
-            note != null -> "I understand you're asking about the note '${note.title}': '$message'. This is a placeholder response."
-            else -> "I understand you're asking about: '$message'. This is a placeholder response."
+        return buildString {
+            append("Here are all the user's notes for context:\n\n")
+            allNotes.forEachIndexed { index, note ->
+                append("Note ${index + 1}:\n")
+                append("Title: ${note.title}\n")
+                append("Content: ${note.content}\n")
+                if (index < allNotes.size - 1) {
+                    append("\n---\n\n")
+                }
+            }
+            append("\nPlease use this context to help answer user queries about their notes.")
         }
-        messages.add(ChatMessage(response, false))
-        chatAdapter.notifyItemInserted(messages.size - 1)
-
-        // Scroll to bottom and clear input
-        recyclerView.scrollToPosition(messages.size - 1)
-        editTextMessage.text.clear()
     }
 
-    private fun addInitialMessage() {
-        if (noteId != -1L) {
-            val note = DataHandler.getNoteById(noteId)
-            note?.let {
-                val initialMessage = when (chatMode) {
-                    ChatMode.CHAT -> getString(R.string.chat_with_note_intro, note.title)
-                    ChatMode.SUMMARIZE -> {
-                        messages.add(ChatMessage("Please summarize this note: ${note.title}", true))
-                        getString(R.string.summarize_content_response, note.title)
-                    }
-                    ChatMode.GENERAL -> getString(R.string.chatbot_welcome)
-                }
-                messages.add(ChatMessage(initialMessage, false))
-                chatAdapter.notifyDataSetChanged()
-                recyclerView.scrollToPosition(messages.size - 1)
+    private fun sendMessage(message: String) {
+        lifecycleScope.launch {
+            try {
+                // Add user message to local list
+                messages.add(ChatMessage(message, true))
+                chatAdapter.updateMessages(messages)
+                scrollToBottom()
+
+                // Get assistant's response
+                chatAdapter.setLoading(true)
+                scrollToBottom()
+                val assistantResponses = chatRepository.sendMessage(message)
+                chatAdapter.setLoading(false)
+
+                // Add assistant's responses to the local list
+                messages.addAll(assistantResponses)
+                chatAdapter.updateMessages(messages)
+                scrollToBottom()
+            } catch (e: Exception) {
+                chatAdapter.setLoading(false)
+                messages.add(ChatMessage("Sorry, there was an error: ${e.message}", false))
+                chatAdapter.updateMessages(messages)
+                scrollToBottom()
             }
-        } else {
-            messages.add(ChatMessage(getString(R.string.chatbot_welcome), false))
-            chatAdapter.notifyDataSetChanged()
+        }
+    }
+
+    private suspend fun addInitialMessage() {
+        chatAdapter.setLoading(true)
+
+        try {
+            val initialInstructions: String? = when (chatMode) {
+                ChatMode.CHAT -> {
+                    if (noteId != -1L) {
+                        val note = DataHandler.getNoteById(noteId)
+                        note?.let {
+                            messages.add(ChatMessage("Note: ${note.title}", isUser = true, isNote = true))
+                            chatAdapter.updateMessages(messages)
+                            "Let's discuss this note. Title: ${note.title}. Content: ${note.content}"
+                        }
+                    } else {
+                        null
+                    }
+                }
+                ChatMode.SUMMARIZE -> {
+                    if (noteId != -1L) {
+                        val note = DataHandler.getNoteById(noteId)
+                        note?.let {
+                            messages.add(ChatMessage("Summarize note: ${note.title}", isUser = true, isNote = true))
+                            chatAdapter.updateMessages(messages)
+                            "Please summarize this note. Title: ${note.title}. Content: ${note.content}"
+                        }
+                    } else {
+                        null
+                    }
+                }
+                ChatMode.GENERAL -> {
+                    messages.add(ChatMessage("All notes passed to chatbot", isUser = true, isNote = true))
+                    chatAdapter.updateMessages(messages)
+                    formatNotesContext()
+                }
+            }
+
+            // Send the initial message as instructions (not shown to user)
+            val assistantResponses = if (initialInstructions != null) {
+                chatRepository.sendMessage("", instructions = initialInstructions)
+            } else {
+                chatAdapter.setLoading(false)
+                return
+            }
+            chatAdapter.setLoading(false)
+
+            // Add assistant's responses to the local list
+            messages.addAll(assistantResponses)
+            chatAdapter.updateMessages(messages)
+            scrollToBottom()
+        } catch (e: Exception) {
+            chatAdapter.setLoading(false)
+            messages.add(ChatMessage("Sorry, there was an error initializing the chat: ${e.message}", isUser = false))
+            chatAdapter.updateMessages(messages)
+            scrollToBottom()
+        }
+    }
+
+    private fun scrollToBottom() {
+        recyclerView.post {
+            recyclerView.smoothScrollToPosition(chatAdapter.itemCount - 1)
         }
     }
 

@@ -47,7 +47,7 @@ class FolderOptionsDialog(private val context: Context) {
             .setTitle(R.string.delete_folder)
             .setMessage(R.string.delete_folder_confirmation)
             .setPositiveButton(R.string.delete) { _, _ ->
-                DataHandler.deleteFolder(folder.id)
+                DataHandler.deleteFolderWithSync(folder.id, context)
                 onUpdate()
             }
             .setNegativeButton(R.string.cancel, null)

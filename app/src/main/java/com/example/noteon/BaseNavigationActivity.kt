@@ -40,14 +40,14 @@ abstract class BaseNavigationActivity : AppCompatActivity(), NavigationView.OnNa
 
         loginButton?.setOnClickListener {
             drawerLayout.closeDrawer(GravityCompat.START)
-            // TODO: Implement login functionality
-            Toast.makeText(this, "Login clicked", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
         }
 
         signUpButton?.setOnClickListener {
             drawerLayout.closeDrawer(GravityCompat.START)
-            // TODO: Implement signup functionality
-            Toast.makeText(this, "Sign up clicked", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, SignUpActivity::class.java))
+            finish()
         }
     }
 

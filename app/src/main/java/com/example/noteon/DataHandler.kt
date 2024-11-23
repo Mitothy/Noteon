@@ -1,151 +1,312 @@
 package com.example.noteon
 
-import kotlin.random.Random
+import android.content.Context
+import android.util.Log
+import com.google.firebase.database.FirebaseDatabase
 
 object DataHandler {
-    private val notes = mutableListOf<Note>()
-    private val folders = mutableListOf<Folder>()
-    private var lastNoteId = 0L
-    private var lastFolderId = 0L
+    private lateinit var dbHelper: DatabaseHelper
+    private var usersMap = mutableMapOf<String, User>()
+    private val database = FirebaseDatabase.getInstance().reference
 
-    private val dummyTitles = listOf(
-        "Grocery List", "Meeting Notes", "Book Ideas", "Travel Plans",
-        "Fitness Goals", "Recipe", "Movie Recommendations", "Birthday Gift Ideas",
-        "Project Brainstorm", "Quotes", "Bucket List", "Homework Assignments"
-    )
+    // Initialize with context
+    fun initialize(context: Context) {
+        dbHelper = DatabaseHelper(context)
+    }
 
-    private val dummyContents = listOf(
-        "Remember to buy milk, eggs, and bread.",
-        "Discuss Q3 goals and review last month's performance.",
-        "A mystery novel set in a small town with a twist ending.",
-        "Research hotels in Paris and book flights for next month.",
-        "Run 5k three times a week and do strength training on weekends.",
-        "Ingredients: flour, sugar, eggs. Instructions: Mix and bake at 350°F.",
-        "1. The Shawshank Redemption\n2. Inception\n3. The Matrix",
-        "Mom: scarf, Dad: book, Sister: headphones",
-        "New app idea: AI-powered plant care assistant",
-        "\"The only way to do great work is to love what you do.\" - Steve Jobs",
-        "1. Skydiving\n2. Learn a new language\n3. Visit all 7 continents",
-        "Math: pg 45-47, Science: lab report, English: essay outline"
-    )
+    fun storeUserInfo(user: User) {
+        usersMap[user.id] = user
+        database.child("users")
+            .child(user.id)
+            .setValue(user)
+            .addOnSuccessListener {
+                Log.d("DataHandler", "User profile created successfully")
+            }
+            .addOnFailureListener { e ->
+                Log.w("DataHandler", "Error creating user profile", e)
+            }
+    }
 
-    init {
-        if (notes.isEmpty()) {
-            generateDummyNotes(20)
+    fun addNote(context: Context, title: String, content: String, folderId: Long = 0): Note {
+        val guestSession = GuestSession.getInstance(context)
+        val note = Note(
+            id = 0, // SQLite will auto-generate the ID
+            title = title,
+            content = content,
+            folderId = folderId,
+            userId = if (guestSession.isGuestSession()) {
+                guestSession.getGuestId()
+            } else {
+                AuthManager.getInstance(context).currentUser?.uid
+            }
+        )
+        val id = dbHelper.addNote(note)
+        return note.copy(id = id)
+    }
+
+    fun clearGuestData(guestId: String) {
+        // ONLY clear notes and folders associated with this specific guest ID
+        getAllNotes().filter { it.userId == guestId }.forEach { note ->
+            deleteNotePermanently(note.id)
+        }
+
+        getAllFolders().filter { it.userId == guestId }.forEach { folder ->
+            deleteFolder(folder.id)
         }
     }
 
-    private fun generateDummyNotes(count: Int): List<Note> {
-        notes.clear()
-        repeat(count) {
-            val title = dummyTitles[Random.nextInt(dummyTitles.size)]
-            val content = dummyContents[Random.nextInt(dummyContents.size)]
-            val timestamp = System.currentTimeMillis() - Random.nextLong(0, 30L * 24 * 60 * 60 * 1000)
-            val isFavorite = Random.nextBoolean()
-            val isDeleted = Random.nextDouble() < 0.1 // 10% chance of being in trash
-            val deletedDate = if (isDeleted) System.currentTimeMillis() - Random.nextLong(0, 7L * 24 * 60 * 60 * 1000) else null
-
-            notes.add(Note(
-                id = ++lastNoteId,
-                title = title,
-                content = content,
-                timestamp = timestamp,
-                isFavorite = isFavorite,
-                isDeleted = isDeleted,
-                deletedDate = deletedDate
-            ))
+    fun clearUserData(userId: String) {
+        // Clear all notes for this user
+        getAllNotes().filter { it.userId == userId }.forEach { note ->
+            deleteNotePermanently(note.id)
         }
-        return getAllNotes() // Return only non-deleted notes
-    }
 
-    fun createFolder(name: String, description: String): Folder {
-        val folder = Folder(++lastFolderId, name, description)
-        folders.add(folder)
-        return folder
-    }
-
-    fun searchFolders(query: String): List<Folder> {
-        return folders.filter { folder ->
-            folder.name.contains(query, ignoreCase = true) ||
-                    folder.description.contains(query, ignoreCase = true)
+        // Clear all folders for this user
+        getAllFolders().filter { it.userId == userId }.forEach { folder ->
+            deleteFolder(folder.id)
         }
     }
 
-    fun getAllFolders(): List<Folder> = folders.toList()
-
-    fun getFolderById(id: Long): Folder? = folders.find { it.id == id }
-
-    fun updateFolder(folderId: Long, newName: String, newDescription: String) {
-        folders.find { it.id == folderId }?.let {
-            it.name = newName
-            it.description = newDescription
+    fun convertGuestNotesToUser(guestId: String, userId: String) {
+        val guestNotes = getAllNotes().filter { it.userId == guestId }
+        guestNotes.forEach { note ->
+            val updatedNote = note.copy(userId = userId)
+            dbHelper.updateNote(updatedNote)
         }
     }
 
-    fun deleteFolder(folderId: Long) {
-        folders.removeIf { it.id == folderId }
-        // Move notes in deleted folder to root (no folder)
-        notes.filter { it.folderId == folderId }.forEach { it.folderId = 0 }
+    fun getAllNotes(): List<Note> {
+        return dbHelper.getAllNotes().filter { !it.isDeleted }
     }
 
-    fun moveNoteToFolder(noteId: Long, folderId: Long) {
-        notes.find { it.id == noteId }?.apply {
-            this.folderId = folderId
-        }
-    }
-
-    fun addNote(title: String, content: String, folderId: Long = 0): Note {
-        val newNote = Note(++lastNoteId, title, content, folderId)
-        notes.add(newNote)
-        return newNote
-    }
-
-    fun getAllNotes(): List<Note> = notes.filter { !it.isDeleted }.sortedByDescending { it.timestamp }
-
-    fun getNoteById(id: Long): Note? = notes.find { it.id == id }
+    fun getNoteById(id: Long): Note? = dbHelper.getNoteById(id)
 
     fun updateNote(updatedNote: Note) {
-        val index = notes.indexOfFirst { it.id == updatedNote.id }
-        if (index != -1) {
-            notes[index] = updatedNote
-        }
+        dbHelper.updateNote(updatedNote)
     }
 
     fun toggleNoteFavorite(noteId: Long) {
-        notes.find { it.id == noteId }?.let { note ->
-            note.isFavorite = !note.isFavorite
+        getNoteById(noteId)?.let { note ->
+            val updatedNote = note.copy(isFavorite = !note.isFavorite)
+            dbHelper.updateNote(updatedNote)
         }
     }
 
-    fun getFavoriteNotes(): List<Note> =
-        notes.filter { it.isFavorite && !it.isDeleted }.sortedByDescending { it.timestamp }
+    fun getFavoriteNotes(): List<Note> = dbHelper.getFavoriteNotes()
 
-    fun getNotesInFolder(folderId: Long): List<Note> =
-        notes.filter { it.folderId == folderId && !it.isDeleted }.sortedByDescending { it.timestamp }
+    fun getNotesInFolder(folderId: Long): List<Note> {
+        return dbHelper.getNotesInFolder(folderId).filter { !it.isDeleted }
+    }
 
     fun moveNoteToTrash(noteId: Long) {
-        notes.find { it.id == noteId }?.apply {
-            isDeleted = true
-            deletedDate = System.currentTimeMillis()
+        getNoteById(noteId)?.let { note ->
+            val updatedNote = note.copy(
+                isDeleted = true,
+                deletedDate = System.currentTimeMillis()
+            )
+            dbHelper.updateNote(updatedNote)
         }
     }
 
     fun restoreNoteFromTrash(noteId: Long) {
-        notes.find { it.id == noteId }?.apply {
-            isDeleted = false
-            deletedDate = null
+        getNoteById(noteId)?.let { note ->
+            val updatedNote = note.copy(
+                isDeleted = false,
+                deletedDate = null
+            )
+            dbHelper.updateNote(updatedNote)
         }
     }
 
-    fun getTrashNotes(): List<Note> =
-        notes.filter { it.isDeleted }.sortedByDescending { it.deletedDate }
+    fun getTrashNotes(): List<Note> = dbHelper.getTrashNotes()
 
     fun deleteNotePermanently(noteId: Long) {
-        notes.removeIf { it.id == noteId }
+        // First check if note exists
+        getNoteById(noteId)?.let { note ->
+            // Remove from folder if it's in one
+            if (note.folderId != 0L) {
+                moveNoteToFolder(noteId, 0)
+            }
+            // Delete the note
+            dbHelper.deleteNote(noteId)
+        }
     }
 
     fun emptyTrash() {
-        notes.removeIf { it.isDeleted }
+        dbHelper.emptyTrash()
     }
-}
 
+    fun createFolder(name: String, description: String, context: Context): Folder {
+        val authManager = AuthManager.getInstance(context)
+        val guestSession = GuestSession.getInstance(context)
+
+        val userId = if (guestSession.isGuestSession()) {
+            guestSession.getGuestId()
+        } else {
+            authManager.currentUser?.uid
+        }
+
+        val folder = Folder(
+            id = 0,
+            name = name,
+            description = description,
+            userId = userId   // Store the userId with the folder
+        )
+        val id = dbHelper.addFolder(folder)
+        return folder.copy(id = id)
+    }
+
+    fun getFoldersByUser(context: Context): List<Folder> {
+        val authManager = AuthManager.getInstance(context)
+        val guestSession = GuestSession.getInstance(context)
+
+        val currentUserId = if (guestSession.isGuestSession()) {
+            guestSession.getGuestId()
+        } else {
+            authManager.currentUser?.uid
+        }
+
+        // Only return folders for the current user
+        return dbHelper.getAllFolders().filter { it.userId == currentUserId }
+    }
+
+
+    fun getAllFolders(): List<Folder> = dbHelper.getAllFolders()
+
+    fun getFolderById(id: Long): Folder? = dbHelper.getFolderById(id)
+
+    fun updateFolder(folderId: Long, newName: String, newDescription: String) {
+        getFolderById(folderId)?.let { folder ->
+            val updatedFolder = folder.copy(
+                name = newName,
+                description = newDescription
+            )
+            dbHelper.updateFolder(updatedFolder)
+        }
+    }
+
+    fun deleteFolder(folderId: Long) {
+        // First get all notes in this folder
+        val notesInFolder = getNotesInFolder(folderId)
+
+        // Move all notes to root (folderId = 0)
+        notesInFolder.forEach { note ->
+            moveNoteToFolder(note.id, 0)
+        }
+
+        // Delete the folder
+        dbHelper.deleteFolder(folderId)
+    }
+
+    fun moveNoteToFolder(noteId: Long, folderId: Long) {
+        getNoteById(noteId)?.let { note ->
+            val updatedNote = note.copy(folderId = folderId)
+            dbHelper.updateNote(updatedNote)
+        }
+    }
+
+    fun searchFolders(query: String): List<Folder> = dbHelper.searchFolders(query)
+
+    fun addFolderFromSync(folder: Folder): Folder {
+        val id = dbHelper.upsertSyncedFolder(folder)
+        return folder.copy(id = id)
+    }
+
+    fun markNoteAsSynced(noteId: Long, userId: String) {
+        getNoteById(noteId)?.let { note ->
+            val updatedNote = note.copy(
+                isSynced = true,
+                userId = userId
+            )
+            dbHelper.updateNote(updatedNote)
+        }
+    }
+
+    fun addNoteFromSync(note: Note): Note {
+        val id = dbHelper.upsertSyncedNote(note)
+        return note.copy(id = id)
+    }
+
+
+    fun getUserName(userId: String): String? {
+        return usersMap[userId]?.name
+    }
+
+    fun deleteNoteWithSync(noteId: Long, context: Context) {
+        val authManager = AuthManager.getInstance(context)
+        val note = getNoteById(noteId)
+
+        if (note != null && authManager.currentUser?.uid == note.userId) {
+            database.child("users")
+                .child(authManager.currentUser!!.uid)
+                .child("notes")
+                .child(noteId.toString())
+                .removeValue()
+                .addOnSuccessListener {
+                    Log.d("DataHandler", "Note deleted from Firebase")
+                }
+                .addOnFailureListener { e ->
+                    Log.w("DataHandler", "Error deleting note from Firebase", e)
+                }
+        }
+
+        deleteNotePermanently(noteId)
+    }
+
+    fun emptyTrashWithSync(context: Context) {
+        val authManager = AuthManager.getInstance(context)
+        val trashNotes = getTrashNotes()
+
+        if (authManager.currentUser != null) {
+            trashNotes.forEach { note ->
+                if (note.userId == authManager.currentUser?.uid) {
+                    database.child("users")
+                        .child(authManager.currentUser!!.uid)
+                        .child("notes")
+                        .child(note.id.toString())
+                        .removeValue()
+                        .addOnSuccessListener {
+                            Log.d("DataHandler", "Note ${note.id} deleted from Firebase")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.w("DataHandler", "Error deleting note ${note.id} from Firebase", e)
+                        }
+                }
+            }
+        }
+
+        emptyTrash()
+    }
+
+    fun deleteFolderWithSync(folderId: Long, context: Context) {
+        val authManager = AuthManager.getInstance(context)
+        val folder = getFolderById(folderId)
+
+        if (folder != null && authManager.currentUser?.uid == folder.userId) {
+            // First delete locally
+            deleteFolder(folderId)
+
+            // Then remove from Firebase
+            database.child("users")
+                .child(authManager.currentUser!!.uid)
+                .child("folders")
+                .child(folderId.toString())
+                .removeValue()
+                .addOnFailureListener { e ->
+                    Log.e("DataHandler", "Failed to delete folder from Firebase: ${e.message}")
+                }
+        } else {
+            // If not synced or guest user, just delete locally
+            deleteFolder(folderId)
+        }
+    }
+
+    fun clearSyncedFolders(userId: String) {
+        getAllFolders()
+            .filter { it.userId == userId && it.isSynced }
+            .forEach { folder ->
+                deleteFolder(folder.id)
+            }
+    }
+
+}

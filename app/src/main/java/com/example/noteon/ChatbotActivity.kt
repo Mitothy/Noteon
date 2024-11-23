@@ -60,7 +60,6 @@ class ChatbotActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setDisplayShowHomeEnabled(true)
 
-        // Set title based on mode
         val title = when {
             noteTitle != null -> getString(R.string.chatbot_note_title, noteTitle)
             else -> getString(R.string.chatbot)
@@ -78,7 +77,8 @@ class ChatbotActivity : AppCompatActivity() {
         chatAdapter = ChatAdapter(messages)
         recyclerView.apply {
             layoutManager = LinearLayoutManager(this@ChatbotActivity).apply {
-                stackFromEnd = true
+                stackFromEnd = false
+                reverseLayout = false
             }
             adapter = chatAdapter
         }
@@ -97,49 +97,81 @@ class ChatbotActivity : AppCompatActivity() {
     private fun sendMessage(message: String) {
         lifecycleScope.launch {
             try {
-                // Add user message immediately
+                // Add user message to local list
                 messages.add(ChatMessage(message, true))
-                chatAdapter.notifyItemInserted(messages.size - 1)
-                recyclerView.scrollToPosition(messages.size - 1)
+                chatAdapter.updateMessages(messages)
+                scrollToBottom()
 
-                // Get response from OpenAI
-                val updatedMessages = chatRepository.sendMessage(message)
+                // Get assistant's response
+                chatAdapter.setLoading(true)
+                scrollToBottom()
+                val assistantResponses = chatRepository.sendMessage(message)
+                chatAdapter.setLoading(false)
 
-                // Clear existing messages and add all updated messages
-                messages.clear()
-                messages.addAll(updatedMessages)
-                chatAdapter.notifyDataSetChanged()
-                recyclerView.scrollToPosition(messages.size - 1)
+                // Add assistant's responses to the local list
+                messages.addAll(assistantResponses)
+                chatAdapter.updateMessages(messages)
+                scrollToBottom()
             } catch (e: Exception) {
+                chatAdapter.setLoading(false)
                 messages.add(ChatMessage("Sorry, there was an error: ${e.message}", false))
-                chatAdapter.notifyItemInserted(messages.size - 1)
-                recyclerView.scrollToPosition(messages.size - 1)
+                chatAdapter.updateMessages(messages)
+                scrollToBottom()
             }
         }
     }
 
     private suspend fun addInitialMessage() {
-        if (noteId != -1L) {
-            val note = DataHandler.getNoteById(noteId)
-            note?.let {
-                val initialMessage = when (chatMode) {
-                    ChatMode.CHAT -> {
-                        "I'd like to chat about the note titled '${note.title}'. Here's the content:\n\n${note.content}"
+        chatAdapter.setLoading(true)
+
+        try {
+            val initialInstructions = when {
+                noteId != -1L -> {
+                    val note = DataHandler.getNoteById(noteId)
+                    note?.let {
+                        when (chatMode) {
+                            ChatMode.CHAT -> {
+                                messages.add(ChatMessage("Note: ${note.title}",
+                                    isUser = true,
+                                    isNote = true
+                                ))
+                                chatAdapter.updateMessages(messages)
+                                "Let's discuss this note. Title: ${note.title}. Content: ${note.content}"
+                            }
+                            ChatMode.SUMMARIZE -> {
+                                messages.add(ChatMessage("Summarizing note: ${note.title}",
+                                    isUser = true,
+                                    isNote = true
+                                ))
+                                chatAdapter.updateMessages(messages)
+                                "Please summarize this note. Title: ${note.title}. Content: ${note.content}"
+                            }
+                            ChatMode.GENERAL -> null
+                        }
                     }
-                    ChatMode.SUMMARIZE -> {
-                        "Please summarize this note:\n\nTitle: ${note.title}\n\nContent: ${note.content}"
-                    }
-                    ChatMode.GENERAL -> getString(R.string.chatbot_welcome)
                 }
-                val responses = chatRepository.sendMessage(initialMessage)
-                messages.addAll(responses)
-                chatAdapter.notifyDataSetChanged()
-                recyclerView.scrollToPosition(messages.size - 1)
+                else -> null
             }
-        } else {
-            val responses = chatRepository.sendMessage(getString(R.string.chatbot_welcome))
-            messages.addAll(responses)
-            chatAdapter.notifyDataSetChanged()
+
+            // Send the initial message as instructions
+            val assistantResponses = chatRepository.sendMessage("", instructions = initialInstructions)
+            chatAdapter.setLoading(false)
+
+            // Add assistant's responses to the local list
+            messages.addAll(assistantResponses)
+            chatAdapter.updateMessages(messages)
+            scrollToBottom()
+        } catch (e: Exception) {
+            chatAdapter.setLoading(false)
+            messages.add(ChatMessage("Sorry, there was an error initializing the chat: ${e.message}", false))
+            chatAdapter.updateMessages(messages)
+            scrollToBottom()
+        }
+    }
+
+    private fun scrollToBottom() {
+        recyclerView.post {
+            recyclerView.smoothScrollToPosition(chatAdapter.itemCount - 1)
         }
     }
 

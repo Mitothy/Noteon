@@ -31,8 +31,8 @@ interface OpenAIService {
     @GET("threads/{threadId}/messages")
     suspend fun getMessages(
         @Path("threadId") threadId: String,
-        @Query("order") order: String = "desc",
-        @Query("limit") limit: Int = 20
+        @Query("order") order: String = "asc",
+        @Query("limit") limit: Int = 100
     ): MessagesResponse
 
     companion object {

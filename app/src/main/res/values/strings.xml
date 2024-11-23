@@ -87,10 +87,10 @@
     <string name="dont_have_account">Don\'t have an account?</string>
     <string name="already_have_account">Already have an account?</string>
     <string name="sign_in">Sign In</string>
-    <string name="signing_in">Signing in...</string>
-    <string name="creating_account">Creating account...</string>
+    <string name="signing_in">Signing in…</string>
+    <string name="creating_account">Creating account…</string>
     <string name="sign_out">Sign Out</string>
-    <string name="sync_in_progress">Syncing notes...</string>
+    <string name="sync_in_progress">Syncing notes…</string>
     <string name="email_required">Email is required</string>
     <string name="invalid_email">Please enter a valid email</string>
     <string name="password_required">Password is required</string>
@@ -98,7 +98,7 @@
     <string name="authentication_failed">Authentication failed</string>
     <string name="server_error">Server error occurred</string>
     <string name="default_web_client_id">1000187328055-sle6einkhg2nctls75or461injt51ma0.apps.googleusercontent.com</string>
-    <string name="please_wait">Please wait...</string>
+    <string name="please_wait">Please wait…</string>
     <string name="name">Name</string>
     <string name="nav_username">Username</string>
     <string name="nav_email">Email</string>
@@ -113,4 +113,6 @@
     <string name="please_sign_in">Please sign in to access all features</string>
     <string name="sync_not_available_guest">Sync is not available in guest mode</string>
     <string name="sync_percentage">%d%%</string>
+    <string name="assistant_typing">Assistant is typing…</string>
+    <string name="note_icon">Note Icon</string>
 </resources>

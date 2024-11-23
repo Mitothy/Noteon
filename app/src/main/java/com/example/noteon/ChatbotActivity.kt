@@ -94,6 +94,24 @@ class ChatbotActivity : AppCompatActivity() {
         }
     }
 
+    private fun formatNotesContext(): String {
+        val allNotes = DataHandler.getAllNotes()
+            .filter { !it.isDeleted }
+
+        return buildString {
+            append("Here are all the user's notes for context:\n\n")
+            allNotes.forEachIndexed { index, note ->
+                append("Note ${index + 1}:\n")
+                append("Title: ${note.title}\n")
+                append("Content: ${note.content}\n")
+                if (index < allNotes.size - 1) {
+                    append("\n---\n\n")
+                }
+            }
+            append("\nPlease use this context to help answer user queries about their notes.")
+        }
+    }
+
     private fun sendMessage(message: String) {
         lifecycleScope.launch {
             try {
@@ -125,36 +143,45 @@ class ChatbotActivity : AppCompatActivity() {
         chatAdapter.setLoading(true)
 
         try {
-            val initialInstructions = when {
-                noteId != -1L -> {
-                    val note = DataHandler.getNoteById(noteId)
-                    note?.let {
-                        when (chatMode) {
-                            ChatMode.CHAT -> {
-                                messages.add(ChatMessage("Note: ${note.title}",
-                                    isUser = true,
-                                    isNote = true
-                                ))
-                                chatAdapter.updateMessages(messages)
-                                "Let's discuss this note. Title: ${note.title}. Content: ${note.content}"
-                            }
-                            ChatMode.SUMMARIZE -> {
-                                messages.add(ChatMessage("Summarizing note: ${note.title}",
-                                    isUser = true,
-                                    isNote = true
-                                ))
-                                chatAdapter.updateMessages(messages)
-                                "Please summarize this note. Title: ${note.title}. Content: ${note.content}"
-                            }
-                            ChatMode.GENERAL -> null
+            val initialInstructions: String? = when (chatMode) {
+                ChatMode.CHAT -> {
+                    if (noteId != -1L) {
+                        val note = DataHandler.getNoteById(noteId)
+                        note?.let {
+                            messages.add(ChatMessage("Note: ${note.title}", isUser = true, isNote = true))
+                            chatAdapter.updateMessages(messages)
+                            "Let's discuss this note. Title: ${note.title}. Content: ${note.content}"
                         }
+                    } else {
+                        null
                     }
                 }
-                else -> null
+                ChatMode.SUMMARIZE -> {
+                    if (noteId != -1L) {
+                        val note = DataHandler.getNoteById(noteId)
+                        note?.let {
+                            messages.add(ChatMessage("Summarize note: ${note.title}", isUser = true, isNote = true))
+                            chatAdapter.updateMessages(messages)
+                            "Please summarize this note. Title: ${note.title}. Content: ${note.content}"
+                        }
+                    } else {
+                        null
+                    }
+                }
+                ChatMode.GENERAL -> {
+                    messages.add(ChatMessage("All notes passed to chatbot", isUser = true, isNote = true))
+                    chatAdapter.updateMessages(messages)
+                    formatNotesContext()
+                }
             }
 
-            // Send the initial message as instructions
-            val assistantResponses = chatRepository.sendMessage("", instructions = initialInstructions)
+            // Send the initial message as instructions (not shown to user)
+            val assistantResponses = if (initialInstructions != null) {
+                chatRepository.sendMessage("", instructions = initialInstructions)
+            } else {
+                chatAdapter.setLoading(false)
+                return
+            }
             chatAdapter.setLoading(false)
 
             // Add assistant's responses to the local list
@@ -163,7 +190,7 @@ class ChatbotActivity : AppCompatActivity() {
             scrollToBottom()
         } catch (e: Exception) {
             chatAdapter.setLoading(false)
-            messages.add(ChatMessage("Sorry, there was an error initializing the chat: ${e.message}", false))
+            messages.add(ChatMessage("Sorry, there was an error initializing the chat: ${e.message}", isUser = false))
             chatAdapter.updateMessages(messages)
             scrollToBottom()
         }

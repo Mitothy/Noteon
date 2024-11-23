@@ -27,7 +27,7 @@ class SmartCategorizationService {
             val runResponse = openAIService.createRun(
                 currentThreadId!!,
                 RunRequest(
-                    assistant_id = "asst_K79ky1DNr6nPMsBPu0hJFEaz"
+                    assistant_id = OpenAIConfig.CLASSIFIER_ASSISTANT_ID
                 )
             )
 

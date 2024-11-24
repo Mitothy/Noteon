@@ -9,6 +9,7 @@ class PreferencesManager private constructor(context: Context) {
     companion object {
         private const val PREF_NAME = "noteon_preferences"
         private const val KEY_SMART_CATEGORIZATION = "smart_categorization"
+        private const val KEY_INTELLIGENT_SEARCH = "intelligent_search"
 
         @Volatile
         private var instance: PreferencesManager? = null
@@ -26,5 +27,13 @@ class PreferencesManager private constructor(context: Context) {
 
     fun isSmartCategorizationEnabled(): Boolean {
         return prefs.getBoolean(KEY_SMART_CATEGORIZATION, false)
+    }
+
+    fun setIntelligentSearchEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_INTELLIGENT_SEARCH, enabled).apply()
+    }
+
+    fun isIntelligentSearchEnabled(): Boolean {
+        return prefs.getBoolean(KEY_INTELLIGENT_SEARCH, false)
     }
 }

@@ -91,7 +91,7 @@ class NoteOptionsDialog(
                     // Show loading dialog on the main thread
                     withContext(Dispatchers.Main) {
                         loadingDialog = MaterialAlertDialogBuilder(context)
-                            .setTitle(R.string.loading)
+                            .setTitle(R.string.smart_categorization)
                             .setMessage(R.string.sorting_folders)
                             .setCancelable(false)
                             .show()

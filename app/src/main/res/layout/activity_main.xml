@@ -70,7 +70,7 @@
             android:layout_gravity="start|bottom"
             android:layout_margin="16dp"
             android:contentDescription="@string/chat_with_bot"
-            android:src="@android:drawable/ic_dialog_email" />
+            android:src="@drawable/ic_smart_toy" />
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

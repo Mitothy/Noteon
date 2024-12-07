@@ -5,7 +5,7 @@
     <string name="note_content">Note Content</string>
     <string name="save_note">Save Note</string>
     <string name="search_notes">Search notes…</string>
-    <string name="footer_text">© 2024 Noteon App</string>
+    <string name="footer_text">AI-powered note organization</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="all_notes">All Notes</string>

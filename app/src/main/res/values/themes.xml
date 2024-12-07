@@ -17,4 +17,15 @@
         <item name="iconGravity">textStart</item>
         <item name="strokeWidth">0dp</item>
     </style>
+    <!-- themes.xml -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Set the splash screen background color -->
+        <item name="windowSplashScreenBackground">@color/colorBackground</item>
+
+        <!-- Use the Noteon logo as splash screen icon -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/noteon_logo</item>
+
+        <!-- Set the theme used after splash screen is shown -->
+        <item name="postSplashScreenTheme">@style/Theme.Noteon</item>
+    </style>
 </resources>

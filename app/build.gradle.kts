@@ -93,4 +93,6 @@ dependencies {
     // OkHttp + Logging
     implementation(libs.okhttp3)
     implementation(libs.okhttp3.logging.interceptor)
+
+    implementation(libs.androidx.splashscreen)
 }

@@ -4,9 +4,12 @@ import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -30,12 +33,17 @@ class MainActivity : BaseNavigationActivity() {
     private lateinit var fabAddNote: FloatingActionButton
     private lateinit var fabChatbot: FloatingActionButton
     private lateinit var searchView: SearchView
+    private var isSearching = false
+    private lateinit var searchHelperText: TextView
+    private lateinit var searchLoadingIndicator: ProgressBar
+    private lateinit var preferencesManager: PreferencesManager
+    private lateinit var intelligentSearchService: IntelligentSearchService
     private lateinit var notesAdapter: NotesAdapter
     private lateinit var notes: List<Note>
     private var currentFolderId: Long = 0
     private var currentView = ViewType.ALL_NOTES
     private lateinit var authManager: AuthManager
-    private lateinit var guestSession: GuestSession  // Add this
+    private lateinit var guestSession: GuestSession
 
     override val currentNavigationItem: Int
         get() = when (currentView) {
@@ -68,9 +76,11 @@ class MainActivity : BaseNavigationActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize AuthManager
+        // Initialize managers
         authManager = AuthManager.getInstance(this)
         guestSession = GuestSession.getInstance(this)
+        preferencesManager = PreferencesManager.getInstance(this)
+        intelligentSearchService = IntelligentSearchService()
 
         // Check if user is signed in or in guest mode
         if (authManager.currentUser == null && !GuestSession.getInstance(this).isGuestSession()) {
@@ -158,16 +168,123 @@ class MainActivity : BaseNavigationActivity() {
     }
 
     private fun setupSearchView() {
+        searchHelperText = TextView(this).apply {
+            id = View.generateViewId()
+            setTextAppearance(android.R.style.TextAppearance_Small)
+            alpha = 0.7f
+            visibility = View.GONE
+        }
+
+        searchLoadingIndicator = ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
+            id = View.generateViewId()
+            visibility = View.GONE
+        }
+
+        // Add helper text and loading indicator below SearchView
+        val searchContainer = searchView.parent as ViewGroup
+        val searchIndex = searchContainer.indexOfChild(searchView)
+
+        // Layout for loading indicator and helper text
+        val horizontalLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(16, 4, 16, 16)
+            }
+
+            addView(searchLoadingIndicator, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = 8
+            })
+            addView(searchHelperText, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+
+        searchContainer.addView(horizontalLayout, searchIndex + 1)
+
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                return false
+                if (!query.isNullOrBlank()) {
+                    performSearch(query)
+                }
+                return true
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
-                filterNotes(newText)
+                if (newText.isNullOrBlank()) {
+                    notesAdapter.updateNotes(notes)
+                    updateSearchHelperText(false)
+                    return true
+                }
+
+                if (preferencesManager.isIntelligentSearchEnabled()) {
+                    updateSearchHelperText(true)
+                    filterNotes(newText)
+                } else {
+                    updateSearchHelperText(false)
+                    filterNotes(newText)
+                }
                 return true
             }
         })
+    }
+
+    private fun updateSearchHelperText(showIntelligentSearch: Boolean) {
+        if (showIntelligentSearch) {
+            searchHelperText.apply {
+                text = getString(R.string.press_enter_for_intelligent_search)
+                visibility = View.VISIBLE
+            }
+        } else {
+            searchHelperText.visibility = View.GONE
+        }
+    }
+
+    private fun performSearch(query: String) {
+        if (!preferencesManager.isIntelligentSearchEnabled()) {
+            filterNotes(query)
+            return
+        }
+
+        isSearching = true
+        searchLoadingIndicator.visibility = View.VISIBLE
+        searchHelperText.apply {
+            text = getString(R.string.intelligent_search_progress)
+            visibility = View.VISIBLE
+        }
+
+        lifecycleScope.launch {
+            try {
+                val searchResults = intelligentSearchService.searchNotes(query, notes)
+                notesAdapter.updateNotes(searchResults)
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@MainActivity,
+                    R.string.search_error,
+                    Toast.LENGTH_SHORT
+                ).show()
+                filterNotes(query)
+            } finally {
+                searchLoadingIndicator.visibility = View.GONE
+                searchHelperText.visibility = View.GONE
+                isSearching = false
+            }
+        }
+    }
+
+    private fun filterNotes(query: String) {
+        val filteredNotes = notes.filter { note ->
+            note.title.contains(query, ignoreCase = true) ||
+                    note.content.contains(query, ignoreCase = true)
+        }
+        notesAdapter.updateNotes(filteredNotes)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -289,18 +406,6 @@ class MainActivity : BaseNavigationActivity() {
         updateNotesList()
         updateTitle()
         updateNavigationSelection()
-    }
-
-    private fun filterNotes(query: String?) {
-        if (query.isNullOrBlank()) {
-            notesAdapter.updateNotes(notes)
-        } else {
-            val filteredNotes = notes.filter { note ->
-                note.title.contains(query, ignoreCase = true) ||
-                        note.content.contains(query, ignoreCase = true)
-            }
-            notesAdapter.updateNotes(filteredNotes)
-        }
     }
 
     private fun openNoteDetail(noteId: Long) {

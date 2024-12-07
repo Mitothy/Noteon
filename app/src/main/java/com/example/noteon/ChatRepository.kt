@@ -22,7 +22,7 @@ class ChatRepository {
         val runResponse = openAIService.createRun(
             threadId,
             RunRequest(
-                assistant_id = OpenAIConfig.ASSISTANT_ID,
+                assistant_id = OpenAIConfig.CHATBOT_ASSISTANT_ID,
                 instructions = instructions
             )
         )

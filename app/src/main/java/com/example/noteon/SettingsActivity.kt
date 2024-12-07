@@ -21,6 +21,12 @@ class SettingsActivity : AppCompatActivity() {
         setupSwitches()
     }
 
+    override fun onResume() {
+        super.onResume()
+        switchIntelligentSearch.isChecked = preferencesManager.isIntelligentSearchEnabled()
+        switchSmartCategorization.isChecked = preferencesManager.isSmartCategorizationEnabled()
+    }
+
     private fun setupToolbar() {
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -33,12 +39,12 @@ class SettingsActivity : AppCompatActivity() {
         switchSmartCategorization = findViewById(R.id.switchSmartCategorization)
 
         // Load saved preferences
-        switchIntelligentSearch.isChecked = false
+        switchIntelligentSearch.isChecked = preferencesManager.isSmartCategorizationEnabled()
         switchSmartCategorization.isChecked = preferencesManager.isSmartCategorizationEnabled()
 
         // Setup listeners
         switchIntelligentSearch.setOnCheckedChangeListener { _, isChecked ->
-            // TODO: Implement intelligent search toggle functionality
+            preferencesManager.setIntelligentSearchEnabled(isChecked)
         }
 
         switchSmartCategorization.setOnCheckedChangeListener { _, isChecked ->

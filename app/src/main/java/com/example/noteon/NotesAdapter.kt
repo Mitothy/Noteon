@@ -30,7 +30,7 @@ class NotesAdapter(
                     append(" ★")
                 }
             }
-            textViewContent.text = note.content
+            MarkdownUtils.renderPreview(textViewContent, note.content)
 
             itemView.setOnClickListener { onNoteClick(note) }
             buttonOptions.setOnClickListener {

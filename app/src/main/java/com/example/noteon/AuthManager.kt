@@ -29,11 +29,54 @@ class AuthManager private constructor(private val context: Context) {
     }
 
     fun signOut() {
+        // Clear settings before signing out
+        PreferencesManager.getInstance(context).clearSettings()
+
         // Clear data for current user before signing out
         currentUser?.let { user ->
             DataHandler.clearUserData(user.uid)
         }
         auth.signOut()
+    }
+
+    suspend fun restoreData() {
+        currentUser?.let { user ->
+            try {
+                // First restore settings
+                PreferencesManager.getInstance(context).restoreSettingsFromFirebase(user.uid)
+
+                // Then restore folders to ensure proper hierarchy
+                restoreFolders()
+
+                // Finally restore notes
+                restoreNotes()
+
+                Log.d(TAG, "All data restored successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during data restoration", e)
+                throw e
+            }
+        }
+    }
+
+    suspend fun backupData(onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }) {
+        currentUser?.let { user ->
+            try {
+                // First backup settings
+                PreferencesManager.getInstance(context).syncSettingsToFirebase(user.uid)
+
+                // Then backup folders
+                backupFolders()
+
+                // Finally backup notes with progress
+                backupNotes(onProgress)
+
+                Log.d(TAG, "All data backed up successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during data backup", e)
+                throw e
+            }
+        }
     }
 
     suspend fun backupNotes(onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }) {

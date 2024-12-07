@@ -121,4 +121,14 @@
     <string name="intelligent_search_progress">Analyzing notes for relevant content…</string>
     <string name="search_error">Search failed. Please try again.</string>
     <string name="press_enter_for_intelligent_search">Press Enter to use Intelligent Search</string>
+    <string name="format_bold">Bold text</string>
+    <string name="format_italic">Italic text</string>
+    <string name="format_strikethrough">Strikethrough text</string>
+    <string name="format_bullet">Add bullet point</string>
+    <string name="format_quote">Add quote</string>
+    <string name="format_heading">Add heading</string>
+    <string name="format_underline">Underline text</string>
+    <string name="format_numbered_list">Add numbered list</string>
+    <string name="edit_note">Edit note</string>
+    <string name="note_detail">Note Detail</string>
 </resources>

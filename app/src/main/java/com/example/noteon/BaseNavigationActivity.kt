@@ -3,6 +3,7 @@ package com.example.noteon
 import android.content.Intent
 import android.view.MenuItem
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -92,6 +93,32 @@ abstract class BaseNavigationActivity : AppCompatActivity(), NavigationView.OnNa
             }
             R.id.nav_about -> {
                 startActivity(Intent(this, AboutActivity::class.java))
+                drawerLayout.closeDrawer(GravityCompat.START)
+                return true
+            }
+            R.id.nav_sign_out -> {
+                if (GuestSession.getInstance(this).isGuestSession()) {
+                    // Show confirmation dialog for guest mode exit
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.exit_guest_mode)
+                        .setMessage(R.string.exit_guest_mode_message)
+                        .setPositiveButton(R.string.exit) { _, _ ->
+                            GuestSession.getInstance(this).clearGuestData(this)
+                            startActivity(Intent(this, LoginActivity::class.java))
+                            finish()
+                        }
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                } else if (AuthManager.getInstance(this).currentUser != null) {
+                    // Regular sign out for authenticated users
+                    AuthManager.getInstance(this).signOut()
+                    startActivity(Intent(this, LoginActivity::class.java))
+                    finish()
+                } else {
+                    // If neither guest nor authenticated, go to login
+                    startActivity(Intent(this, LoginActivity::class.java))
+                    finish()
+                }
                 drawerLayout.closeDrawer(GravityCompat.START)
                 return true
             }

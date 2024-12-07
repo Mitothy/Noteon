@@ -296,16 +296,6 @@ class MainActivity : BaseNavigationActivity() {
         // Hide sync option for guest users or non-authenticated users
         val isAuthenticated = authManager.currentUser != null
         menu.findItem(R.id.action_sync)?.isVisible = isAuthenticated
-
-        // Set correct sign out text
-        menu.findItem(R.id.action_sign_out)?.title =
-            if (guestSession.isGuestSession())
-                getString(R.string.exit_guest_mode)
-            else if (isAuthenticated)
-                getString(R.string.sign_out)
-            else
-                getString(R.string.login)
-
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -313,10 +303,6 @@ class MainActivity : BaseNavigationActivity() {
         return when (item.itemId) {
             R.id.action_sync -> {
                 syncNotes()
-                true
-            }
-            R.id.action_sign_out -> {
-                signOut()
                 true
             }
             else -> super.onOptionsItemSelected(item)

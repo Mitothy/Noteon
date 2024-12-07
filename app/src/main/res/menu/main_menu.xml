@@ -7,9 +7,4 @@
         android:icon="@android:drawable/ic_popup_sync"
         android:title="@string/sync_notes"
         app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_sign_out"
-        android:title="@string/sign_out"
-        app:showAsAction="never" />
 </menu>

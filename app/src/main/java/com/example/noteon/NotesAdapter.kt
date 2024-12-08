@@ -35,7 +35,16 @@ class NotesAdapter(
             itemView.setOnClickListener { onNoteClick(note) }
             buttonOptions.setOnClickListener {
                 NoteOptionsDialog(itemView.context, coroutineScope).show(note, isTrashView) {
-                    notifyDataSetChanged()
+                    val updatedNotes = if (isTrashView) {
+                        DataHandler.getTrashNotes()
+                    } else {
+                        when {
+                            note.folderId != 0L -> DataHandler.getNotesInFolder(note.folderId)
+                            note.isFavorite -> DataHandler.getFavoriteNotes()
+                            else -> DataHandler.getAllNotes()
+                        }
+                    }
+                    updateNotes(updatedNotes)
                 }
             }
             // Hide AI options in trash view

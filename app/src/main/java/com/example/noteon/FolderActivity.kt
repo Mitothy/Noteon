@@ -1,5 +1,6 @@
 package com.example.noteon
 
+import android.app.Dialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -16,6 +17,10 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import android.widget.TextView
 import android.view.View
+import android.widget.ProgressBar
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class FolderActivity : BaseNavigationActivity() {
     private lateinit var navigationView: NavigationView
@@ -172,4 +177,62 @@ class FolderActivity : BaseNavigationActivity() {
         menuInflater.inflate(R.menu.main_menu, menu)
         return true
     }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_sync -> {
+                syncFolders()
+                true
+            }
+            android.R.id.home -> {
+                finish()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        // Hide sync option for guest users or non-authenticated users
+        val isAuthenticated = authManager.currentUser != null
+        menu.findItem(R.id.action_sync)?.isVisible = isAuthenticated
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun syncFolders() {
+        if (guestSession.isGuestSession()) {
+            Toast.makeText(this, R.string.sync_not_available_guest, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val progressDialog = Dialog(this).apply {
+            setContentView(R.layout.dialog_progress)
+            setCancelable(false)
+        }
+
+        val progressBar = progressDialog.findViewById<ProgressBar>(R.id.progressBar)
+        val textViewPercentage = progressDialog.findViewById<TextView>(R.id.textViewPercentage)
+        val textViewProgress = progressDialog.findViewById<TextView>(R.id.textViewProgress)
+
+        lifecycleScope.launch {
+            try {
+                progressDialog.show()
+
+                // First sync folders
+                textViewProgress.text = getString(R.string.sync_in_progress)
+                authManager.backupFolders()
+                authManager.restoreFolders()
+
+                // Update UI
+                folderAdapter.updateFolders(DataHandler.getFoldersByUser(this@FolderActivity))
+
+                Toast.makeText(this@FolderActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@FolderActivity, R.string.sync_error, Toast.LENGTH_SHORT).show()
+            } finally {
+                progressDialog.dismiss()
+            }
+        }
+    }
+
 }

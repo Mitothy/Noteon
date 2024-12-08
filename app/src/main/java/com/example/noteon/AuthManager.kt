@@ -186,26 +186,37 @@ class AuthManager private constructor(private val context: Context) {
     suspend fun backupFolders() {
         currentUser?.let { user ->
             try {
-                // Get reference to all folders for this user
                 val userFoldersRef = database
                     .child("users")
                     .child(user.uid)
                     .child("folders")
 
-                // Get current folders in Firebase
+                // Get all folders for current user
+                val folders = DataHandler.getFoldersByUser(context)
+
+                // Upload each folder
+                folders.forEach { folder ->
+                    val folderMap = hashMapOf(
+                        "id" to folder.id,
+                        "name" to folder.name,
+                        "description" to folder.description,
+                        "timestamp" to folder.timestamp,
+                        "userId" to user.uid
+                    )
+
+                    userFoldersRef.child(folder.id.toString())
+                        .setValue(folderMap)
+                        .await()
+                }
+
+                // Get all folder IDs in Firebase
                 val foldersSnapshot = userFoldersRef.get().await()
-
-                // Get all folder IDs that exist in Firebase
-                val firebaseFolderIds = foldersSnapshot.children.mapNotNull {
-                    it.child("id").getValue(Long::class.java)
-                }.toSet()
-
-                // Get all local folder IDs
-                val localFolderIds = DataHandler.getFoldersByUser(context)
-                    .map { it.id }
+                val firebaseFolderIds = foldersSnapshot.children
+                    .mapNotNull { it.child("id").getValue(Long::class.java) }
                     .toSet()
 
                 // Delete folders from Firebase that don't exist locally
+                val localFolderIds = folders.map { it.id }.toSet()
                 firebaseFolderIds.forEach { folderId ->
                     if (folderId !in localFolderIds) {
                         userFoldersRef.child(folderId.toString())
@@ -214,7 +225,7 @@ class AuthManager private constructor(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error syncing folder deletions", e)
+                Log.e(TAG, "Error backing up folders", e)
                 throw e
             }
         }
@@ -224,7 +235,7 @@ class AuthManager private constructor(private val context: Context) {
     suspend fun restoreFolders() {
         currentUser?.let { user ->
             try {
-                // Clear all synced folders first
+                // Clear existing synced folders
                 DataHandler.clearSyncedFolders(user.uid)
 
                 val foldersSnapshot = database
@@ -234,7 +245,6 @@ class AuthManager private constructor(private val context: Context) {
                     .get()
                     .await()
 
-                // Only restore folders that exist on server
                 foldersSnapshot.children.forEach { folderSnapshot ->
                     try {
                         val folderMap = folderSnapshot.value as? Map<*, *>
@@ -243,10 +253,12 @@ class AuthManager private constructor(private val context: Context) {
                                 id = (folderMap["id"] as? Long) ?: return@forEach,
                                 name = (folderMap["name"] as? String) ?: "",
                                 description = (folderMap["description"] as? String) ?: "",
-                                timestamp = (folderMap["timestamp"] as? Long) ?: System.currentTimeMillis(),
+                                timestamp = (folderMap["timestamp"] as? Long)
+                                    ?: System.currentTimeMillis(),
                                 userId = user.uid,
                                 isSynced = true
                             )
+
                             if (folder.name.isNotEmpty()) {
                                 DataHandler.addFolderFromSync(folder)
                             }

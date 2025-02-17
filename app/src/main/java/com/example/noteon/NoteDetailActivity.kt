@@ -192,14 +192,12 @@ class NoteDetailActivity : AppCompatActivity() {
     }
 
     private fun showDiscardChangesDialog() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.discard_changes)
-            .setMessage(R.string.discard_changes_message)
-            .setPositiveButton(R.string.discard) { _, _ ->
+        DialogUtils.showDiscardChangesDialog(
+            context = this,
+            onDiscard = {
                 disableEditMode()
                 DataHandler.getNoteById(noteId)?.let { displayNote(it) }
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        )
     }
 }

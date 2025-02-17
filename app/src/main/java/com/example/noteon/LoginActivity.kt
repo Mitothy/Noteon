@@ -199,30 +199,25 @@ class LoginActivity : AppCompatActivity() {
         val userId = auth.currentUser?.uid
 
         if (guestId == null || userId == null) {
-            // Something went wrong, just proceed to main activity
             startActivity(Intent(this, MainActivity::class.java))
             finish()
             return
         }
 
-        AlertDialog.Builder(this)
-            .setTitle(R.string.guest_data_found)
-            .setMessage(R.string.convert_guest_data_message)
-            .setPositiveButton(R.string.convert) { _, _ ->
-                // Convert guest data to user data
+        DialogUtils.showGuestDataFoundDialog(
+            context = this,
+            onKeep = {
                 DataHandler.convertGuestNotesToUser(guestId, userId)
                 guestSession.endGuestSession()
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
-            }
-            .setNegativeButton(R.string.discard) { _, _ ->
-                // Clear guest data
+            },
+            onDiscard = {
                 DataHandler.clearGuestData(guestId)
                 guestSession.endGuestSession()
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
             }
-            .setCancelable(false)
-            .show()
+        )
     }
 }

@@ -131,4 +131,6 @@
     <string name="format_numbered_list">Add numbered list</string>
     <string name="edit_note">Edit note</string>
     <string name="note_detail">Note Detail</string>
+    <string name="folder_name_required">Folder name is required</string>
+    <string name="confirm">Confirm</string>
 </resources>

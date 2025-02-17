@@ -14,6 +14,7 @@ class NotesAdapter(
     private val coroutineScope: CoroutineScope,
     private val onNoteClick: (Note) -> Unit,
     private val onAIOptions: (Note) -> Unit,
+    private val onNoteOptions: (Note) -> Unit,
     private val isTrashView: Boolean = false
 ) : RecyclerView.Adapter<NotesAdapter.NoteViewHolder>() {
 
@@ -34,17 +35,8 @@ class NotesAdapter(
 
             itemView.setOnClickListener { onNoteClick(note) }
             buttonOptions.setOnClickListener {
-                NoteOptionsDialog(itemView.context, coroutineScope).show(note, isTrashView) {
-                    val updatedNotes = if (isTrashView) {
-                        DataHandler.getTrashNotes()
-                    } else {
-                        when {
-                            note.folderId != 0L -> DataHandler.getNotesInFolder(note.folderId)
-                            note.isFavorite -> DataHandler.getFavoriteNotes()
-                            else -> DataHandler.getAllNotes()
-                        }
-                    }
-                    updateNotes(updatedNotes)
+                buttonOptions.setOnClickListener {
+                    onNoteOptions(note)
                 }
             }
             // Hide AI options in trash view

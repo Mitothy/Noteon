@@ -121,23 +121,13 @@ class FolderActivity : BaseNavigationActivity() {
     }
 
     private fun showCreateFolderDialog() {
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_create_folder, null)
-        val editTextFolderName = view.findViewById<EditText>(R.id.editTextFolderName)
-        val editTextFolderDescription = view.findViewById<EditText>(R.id.editTextFolderDescription)
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.create_folder)
-            .setView(view)
-            .setPositiveButton(R.string.create) { _, _ ->
-                val folderName = editTextFolderName.text.toString().trim()
-                val folderDescription = editTextFolderDescription.text.toString().trim()
-                if (folderName.isNotEmpty()) {
-                    DataHandler.createFolder(folderName, folderDescription, this)
-                    folderAdapter.updateFolders(DataHandler.getFoldersByUser(this))
-                }
+        DialogUtils.showCreateFolderDialog(
+            context = this,
+            onSave = { name, description ->
+                DataHandler.createFolder(name, description, this)
+                folderAdapter.updateFolders(DataHandler.getFoldersByUser(this))
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        )
     }
 
     private fun updateNavigationHeader() {
@@ -205,21 +195,14 @@ class FolderActivity : BaseNavigationActivity() {
             return
         }
 
-        val progressDialog = Dialog(this).apply {
-            setContentView(R.layout.dialog_progress)
-            setCancelable(false)
-        }
-
-        val progressBar = progressDialog.findViewById<ProgressBar>(R.id.progressBar)
-        val textViewPercentage = progressDialog.findViewById<TextView>(R.id.textViewPercentage)
-        val textViewProgress = progressDialog.findViewById<TextView>(R.id.textViewProgress)
+        val progressDialog = DialogUtils.showProgressDialog(
+            context = this,
+            message = getString(R.string.sync_in_progress)
+        )
 
         lifecycleScope.launch {
             try {
-                progressDialog.show()
-
-                // First sync folders
-                textViewProgress.text = getString(R.string.sync_in_progress)
+                // Sync folders
                 authManager.backupFolders()
                 authManager.restoreFolders()
 

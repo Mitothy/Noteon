@@ -32,15 +32,14 @@ class FolderAdapter(
             buttonEdit.setOnClickListener { onFolderOptions(folder) }
 
             buttonDelete.setOnClickListener {
-                AlertDialog.Builder(itemView.context)
-                    .setTitle(R.string.delete_folder)
-                    .setMessage(R.string.delete_folder_confirmation)
-                    .setPositiveButton(R.string.delete) { _, _ ->
+                DialogUtils.showDeleteFolderConfirmationDialog(
+                    context = itemView.context,
+                    folder = folder,
+                    onConfirm = {
                         DataHandler.deleteFolder(folder.id)
                         updateFolders(folders.filter { it.id != folder.id })
                     }
-                    .setNegativeButton(R.string.cancel, null)
-                    .show()
+                )
             }
         }
     }

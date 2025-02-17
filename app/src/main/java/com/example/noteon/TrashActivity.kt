@@ -38,6 +38,21 @@ class TrashActivity : AppCompatActivity() {
             onNoteClick = { note -> showRestoreDialog(note) },
             coroutineScope = lifecycleScope,
             onAIOptions = { note -> AIOptionsDialog(this).show(note) },
+            onNoteOptions = { note ->
+                DialogUtils.showNoteOptionsDialog(
+                    context = this,
+                    note = note,
+                    isTrashView = true,
+                    onRestoreNote = {
+                        DataHandler.restoreNoteFromTrash(it.id)
+                        loadTrashNotes()
+                    },
+                    onDeletePermanently = {
+                        DataHandler.deleteNotePermanently(it.id)
+                        loadTrashNotes()
+                    }
+                )
+            },
             isTrashView = true
         )
         recyclerViewTrash.apply {
@@ -47,15 +62,16 @@ class TrashActivity : AppCompatActivity() {
     }
 
     private fun showRestoreDialog(note: Note) {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.restore_note)
-            .setMessage(R.string.restore_note_message)
-            .setPositiveButton(R.string.restore) { _, _ ->
+        DialogUtils.showConfirmationDialog(
+            context = this,
+            title = getString(R.string.restore_note),
+            message = getString(R.string.restore_note_message),
+            positiveButton = getString(R.string.restore),
+            onConfirm = {
                 DataHandler.restoreNoteFromTrash(note.id)
                 loadTrashNotes()
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        )
     }
 
     private fun setupEmptyTrashButton() {
@@ -66,15 +82,13 @@ class TrashActivity : AppCompatActivity() {
     }
 
     private fun showEmptyTrashDialog() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.empty_trash)
-            .setMessage(R.string.empty_trash_message)
-            .setPositiveButton(R.string.empty_trash) { _, _ ->
+        DialogUtils.showEmptyTrashDialog(
+            context = this,
+            onConfirm = {
                 DataHandler.emptyTrashWithSync(this)
                 loadTrashNotes()
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        )
     }
 
     private fun loadTrashNotes() {

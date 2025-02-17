@@ -147,9 +147,36 @@ class MainActivity : BaseNavigationActivity() {
     private fun setupRecyclerView() {
         notesAdapter = NotesAdapter(
             notes = notes,
-            onNoteClick = { note -> openNoteDetail(note.id) },
             coroutineScope = lifecycleScope,
+            onNoteClick = { note -> openNoteDetail(note.id) },
             onAIOptions = { note -> AIOptionsDialog(this).show(note) },
+            onNoteOptions = { note ->
+                DialogUtils.showNoteOptionsDialog(
+                    context = this,
+                    note = note,
+                    isTrashView = currentView == ViewType.TRASH,
+                    onRestoreNote = {
+                        DataHandler.restoreNoteFromTrash(it.id)
+                        updateNotesList()
+                    },
+                    onDeletePermanently = {
+                        DataHandler.deleteNoteWithSync(it.id, this)
+                        updateNotesList()
+                    },
+                    onToggleFavorite = {
+                        DataHandler.toggleNoteFavorite(it.id)
+                        updateNotesList()
+                    },
+                    onMoveToFolder = {
+                        val intent = Intent(this, FolderActivity::class.java)
+                        intent.putExtra("NOTE_ID", note.id)
+                        startActivity(intent) },
+                    onMoveToTrash = {
+                        DataHandler.moveNoteToTrash(it.id)
+                        updateNotesList()
+                    }
+                )
+            },
             isTrashView = currentView == ViewType.TRASH
         )
         recyclerViewNotes.layoutManager = LinearLayoutManager(this)
@@ -315,31 +342,29 @@ class MainActivity : BaseNavigationActivity() {
             return
         }
 
-        val progressDialog = Dialog(this).apply {
-            setContentView(R.layout.dialog_progress)
-            setCancelable(false)
-        }
-
-        val progressBar = progressDialog.findViewById<ProgressBar>(R.id.progressBar)
-        val textViewPercentage = progressDialog.findViewById<TextView>(R.id.textViewPercentage)
-        val textViewProgress = progressDialog.findViewById<TextView>(R.id.textViewProgress)
+        val progressDialog = DialogUtils.showProgressDialog(
+            context = this,
+            message = getString(R.string.sync_in_progress)
+        )
 
         lifecycleScope.launch {
             try {
-                progressDialog.show()
-
-                // First sync folders
-                textViewProgress.text = "Syncing folders..."
+                DialogUtils.updateProgressDialog(
+                    dialog = progressDialog,
+                    current = 0,
+                    total = 100,
+                    message = "Syncing folders..."
+                )
                 authManager.backupFolders()
                 authManager.restoreFolders()
 
-                // Then sync notes
-                textViewProgress.text = getString(R.string.sync_in_progress)
                 authManager.backupNotes { current, total ->
-                    progressBar.max = total
-                    progressBar.progress = current
-                    val percentage = ((current.toFloat() / total) * 100).toInt()
-                    textViewPercentage.text = "$percentage%"
+                    DialogUtils.updateProgressDialog(
+                        dialog = progressDialog,
+                        current = current,
+                        total = total,
+                        message = getString(R.string.sync_in_progress)
+                    )
                 }
 
                 Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()

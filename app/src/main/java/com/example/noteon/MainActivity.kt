@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 class MainActivity : BaseNavigationActivity() {
 
     override lateinit var drawerLayout: DrawerLayout
+    private lateinit var toolbar: Toolbar
     private lateinit var recyclerViewNotes: RecyclerView
     private lateinit var navigationView: NavigationView
     private lateinit var fabAddNote: FloatingActionButton
@@ -77,33 +78,25 @@ class MainActivity : BaseNavigationActivity() {
         setContentView(R.layout.activity_main)
 
         // Initialize managers
-        authManager = AuthManager.getInstance(this)
+        authStateManager = AuthStateManager.getInstance(this)
         guestSession = GuestSession.getInstance(this)
         preferencesManager = PreferencesManager.getInstance(this)
         intelligentSearchService = IntelligentSearchService()
 
-        // Check if user is signed in or in guest mode
-        if (authManager.currentUser == null && !GuestSession.getInstance(this).isGuestSession()) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
-        }
-
-        val toolbar: Toolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(toolbar)
-
         setupViews()
-        setupDrawer(toolbar)
+        setupToolbar()
+        setupDrawer()
         setupFolderHandling()
         setupRecyclerView()
         setupFab()
         setupSearchView()
         setupNavigationFooter()
-        updateNavigationHeader()
     }
+
 
     private fun setupViews() {
         drawerLayout = findViewById(R.id.drawerLayout)
+        toolbar = findViewById(R.id.toolbar)
         recyclerViewNotes = findViewById(R.id.recyclerViewNotes)
         fabAddNote = findViewById(R.id.fabAddNote)
         fabChatbot = findViewById(R.id.fabChatbot)
@@ -112,9 +105,15 @@ class MainActivity : BaseNavigationActivity() {
         navigationView.setNavigationItemSelectedListener(this)
     }
 
-    private fun setupDrawer(toolbar: Toolbar) {
+    private fun setupToolbar() {
+        setSupportActionBar(toolbar)
+    }
+
+    private fun setupDrawer() {
         val toggle = ActionBarDrawerToggle(
-            this, drawerLayout, toolbar,
+            this,
+            drawerLayout,
+            toolbar,
             R.string.navigation_drawer_open,
             R.string.navigation_drawer_close
         )
@@ -320,8 +319,7 @@ class MainActivity : BaseNavigationActivity() {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        // Hide sync option for guest users or non-authenticated users
-        val isAuthenticated = authManager.currentUser != null
+        val isAuthenticated = authStateManager.getCurrentState() is AuthState.Authenticated
         menu.findItem(R.id.action_sync)?.isVisible = isAuthenticated
         return super.onPrepareOptionsMenu(menu)
     }
@@ -337,7 +335,7 @@ class MainActivity : BaseNavigationActivity() {
     }
 
     private fun syncNotes() {
-        if (guestSession.isGuestSession()) {
+        if (authStateManager.getCurrentState() !is AuthState.Authenticated) {
             Toast.makeText(this, R.string.sync_not_available_guest, Toast.LENGTH_SHORT).show()
             return
         }
@@ -349,25 +347,34 @@ class MainActivity : BaseNavigationActivity() {
 
         lifecycleScope.launch {
             try {
-                DialogUtils.updateProgressDialog(
-                    dialog = progressDialog,
-                    current = 0,
-                    total = 100,
-                    message = "Syncing folders..."
-                )
-                authManager.backupFolders()
-                authManager.restoreFolders()
-
-                authManager.backupNotes { current, total ->
+                val state = authStateManager.getCurrentState()
+                if (state is AuthState.Authenticated) {
+                    // Get the Firebase user from the authenticated state
+                    val user = state.user
                     DialogUtils.updateProgressDialog(
                         dialog = progressDialog,
-                        current = current,
-                        total = total,
-                        message = getString(R.string.sync_in_progress)
+                        current = 0,
+                        total = 100,
+                        message = "Syncing folders..."
                     )
-                }
+                    user.let {
+                        AuthManager.getInstance(this@MainActivity).apply {
+                            backupFolders()
+                            restoreFolders()
 
-                Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
+                            backupNotes { current, total ->
+                                DialogUtils.updateProgressDialog(
+                                    dialog = progressDialog,
+                                    current = current,
+                                    total = total,
+                                    message = getString(R.string.sync_in_progress)
+                                )
+                            }
+                        }
+                    }
+
+                    Toast.makeText(this@MainActivity, R.string.notes_synced, Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, R.string.sync_error, Toast.LENGTH_SHORT).show()
             } finally {

@@ -28,17 +28,19 @@ object DataHandler {
     }
 
     fun addNote(context: Context, title: String, content: String, folderId: Long = 0): Note {
-        val guestSession = GuestSession.getInstance(context)
+        val state = AuthStateManager.getInstance(context).getCurrentState()
+        val userId = when (state) {
+            is AuthState.Authenticated -> state.user.uid
+            is AuthState.Guest -> GuestSession.getInstance(context).getGuestId()
+            else -> null
+        }
+
         val note = Note(
-            id = 0, // SQLite will auto-generate the ID
+            id = 0,
             title = title,
             content = content,
             folderId = folderId,
-            userId = if (guestSession.isGuestSession()) {
-                guestSession.getGuestId()
-            } else {
-                AuthManager.getInstance(context).currentUser?.uid
-            }
+            userId = userId
         )
         val id = dbHelper.addNote(note)
         return note.copy(id = id)

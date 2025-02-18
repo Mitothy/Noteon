@@ -6,52 +6,48 @@ import android.text.TextUtils
 import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 
-class LoginActivity : AppCompatActivity() {
+class LoginActivity : BaseActivity() {
     private lateinit var editTextEmail: TextInputEditText
     private lateinit var editTextPassword: TextInputEditText
     private lateinit var buttonLogin: MaterialButton
     private lateinit var buttonSignUp: MaterialButton
-    private lateinit var auth: FirebaseAuth
-    private lateinit var googleSignInClient: GoogleSignInClient
+    private lateinit var authStateManager: AuthStateManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        // Initialize Firebase Auth
-        auth = Firebase.auth
+        authStateManager = AuthStateManager.getInstance(this)
 
-        // Configure Google Sign In
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id))
-            .requestEmail()
-            .build()
-        googleSignInClient = GoogleSignIn.getClient(this, gso)
+        if (GuestSession.getInstance(this).isGuestSession()) {
+            if (hasGuestNotes()) {
+                handleGuestDataOnLogin()
+                return
+            } else {
+                GuestSession.getInstance(this).endGuestSession()
+            }
+        }
 
         setupViews()
         setupClickListeners()
     }
 
-    override fun onStart() {
-        super.onStart()
-        // Check if user is signed in
-        val currentUser = auth.currentUser
-        if (currentUser != null) {
-            updateUI(currentUser)
+    private fun checkCurrentState() {
+        when (val state = authStateManager.getCurrentState()) {
+            is AuthState.Authenticated -> {
+                startMainActivity()
+            }
+            is AuthState.Guest -> {
+                startMainActivity()
+            }
+            is AuthState.Unauthenticated -> {
+                // Stay on login screen
+            }
         }
     }
 
@@ -72,22 +68,8 @@ class LoginActivity : AppCompatActivity() {
             finish()
         }
 
-
-        /* findViewById<MaterialButton>(R.id.buttonSignInWithGoogle)?.setOnClickListener {
-            signInWithGoogle()
-        }
-         */
-
         findViewById<MaterialButton>(R.id.buttonContinueAsGuest).setOnClickListener {
-            // Start guest session
-            GuestSession.getInstance(this).startGuestSession()
-
-            // Start MainActivity as guest
-            val intent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            }
-            startActivity(intent)
-            finish()
+            continueAsGuest()
         }
     }
 
@@ -99,55 +81,57 @@ class LoginActivity : AppCompatActivity() {
             showProgressBar()
             lifecycleScope.launch {
                 try {
-                    auth.signInWithEmailAndPassword(email, password)
-                        .addOnCompleteListener(this@LoginActivity) { task ->
-                            if (task.isSuccessful) {
-                                // Restore notes in a coroutine
-                                lifecycleScope.launch {
-                                    try {
-                                        val authManager = AuthManager.getInstance(this@LoginActivity)
-
-                                        // First restore folders to ensure proper hierarchy
-                                        authManager.restoreFolders()
-
-                                        // Then restore notes
-                                        authManager.restoreNotes()
-
-                                        val guestSession = GuestSession.getInstance(this@LoginActivity)
-                                        if (guestSession.isGuestSession() && hasGuestNotes()) {
-                                            handleGuestDataOnLogin()
-                                        } else {
-                                            guestSession.endGuestSession()
-                                            startActivity(Intent(this@LoginActivity, MainActivity::class.java))
-                                            finish()
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("LoginActivity", "Error during sync: ${e.message}", e)
-                                        hideProgressBar()
-                                        Toast.makeText(
-                                            this@LoginActivity,
-                                            "Error syncing data: ${e.message}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                            } else {
-                                hideProgressBar()
-                                Toast.makeText(
-                                    this@LoginActivity,
-                                    "Authentication failed",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                    authStateManager.signIn(email, password) { success, error ->
+                        hideProgressBar()
+                        if (success) {
+                            handleSuccessfulLogin()
+                        } else {
+                            Toast.makeText(
+                                this@LoginActivity,
+                                error ?: getString(R.string.authentication_failed),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
+                    }
                 } catch (e: Exception) {
                     hideProgressBar()
                     Toast.makeText(
                         this@LoginActivity,
-                        "Error: ${e.message}",
+                        getString(R.string.login_failed),
                         Toast.LENGTH_SHORT
                     ).show()
+                    Log.e("LoginActivity", "Error during login", e)
                 }
+            }
+        }
+    }
+
+    private fun handleSuccessfulLogin() {
+        lifecycleScope.launch {
+            try {
+                when (val state = authStateManager.getCurrentState()) {
+                    is AuthState.Authenticated -> {
+                        // Restore data
+                        AuthManager.getInstance(this@LoginActivity).restoreData()
+
+                        // Check for guest data
+                        val guestSession = GuestSession.getInstance(this@LoginActivity)
+                        if (guestSession.isGuestSession() && hasGuestNotes()) {
+                            handleGuestDataOnLogin()
+                        } else {
+                            guestSession.endGuestSession()
+                            startMainActivity()
+                        }
+                    }
+                    else -> startMainActivity()
+                }
+            } catch (e: Exception) {
+                Log.e("LoginActivity", "Error during data sync", e)
+                Toast.makeText(
+                    this@LoginActivity,
+                    "Error syncing data: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -162,11 +146,11 @@ class LoginActivity : AppCompatActivity() {
     private fun validateForm(email: String, password: String): Boolean {
         return when {
             TextUtils.isEmpty(email) && !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
-                editTextEmail.error = "Enter valid email address"
+                editTextEmail.error = getString(R.string.invalid_email)
                 false
             }
             TextUtils.isEmpty(password) -> {
-                editTextPassword.error = "Enter password"
+                editTextPassword.error = getString(R.string.password_required)
                 editTextEmail.error = null
                 false
             }
@@ -178,45 +162,40 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateUI(user: FirebaseUser?) {
-        if (user != null) {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+    private fun continueAsGuest() {
+        authStateManager.startGuestSession()
+        startMainActivity()
+    }
+
+    private fun startMainActivity() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-    }
-
-    private fun showProgressBar() {
-        // Implement progress bar show logic
-    }
-
-    private fun hideProgressBar() {
-        // Implement progress bar hide logic
+        startActivity(intent)
+        finish()
     }
 
     private fun handleGuestDataOnLogin() {
         val guestSession = GuestSession.getInstance(this)
         val guestId = guestSession.getGuestId()
-        val userId = auth.currentUser?.uid
+        val currentState = authStateManager.getCurrentState()
 
-        if (guestId == null || userId == null) {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+        if (guestId == null || currentState !is AuthState.Authenticated) {
+            startMainActivity()
             return
         }
 
         DialogUtils.showGuestDataFoundDialog(
             context = this,
             onKeep = {
-                DataHandler.convertGuestNotesToUser(guestId, userId)
+                DataHandler.convertGuestNotesToUser(guestId, currentState.user.uid)
                 guestSession.endGuestSession()
-                startActivity(Intent(this, MainActivity::class.java))
-                finish()
+                startMainActivity()
             },
             onDiscard = {
                 DataHandler.clearGuestData(guestId)
                 guestSession.endGuestSession()
-                startActivity(Intent(this, MainActivity::class.java))
-                finish()
+                startMainActivity()
             }
         )
     }

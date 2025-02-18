@@ -65,8 +65,15 @@ class FolderActivity : BaseNavigationActivity() {
     }
 
     private fun setupRecyclerView() {
+        val currentState = authStateManager.getCurrentState()
+        val currentUserId = when (currentState) {
+            is AuthState.Authenticated -> currentState.user.uid
+            is AuthState.Guest -> GuestSession.getInstance(this).getGuestId()
+            else -> null
+        }
+
         folderAdapter = FolderAdapter(
-            folders = DataHandler.getFoldersByUser(this),  // Use getFoldersByUser instead of getAllFolders
+            folders = DataHandler.getAllFolders().filter { it.userId == currentUserId },
             onFolderClick = { folder ->
                 val intent = MainActivity.createIntent(this, folder.id)
                 startActivity(intent)
@@ -74,7 +81,7 @@ class FolderActivity : BaseNavigationActivity() {
             },
             onFolderOptions = { folder ->
                 FolderOptionsDialog(this).show(folder) {
-                    folderAdapter.updateFolders(DataHandler.getFoldersByUser(this))  // Update here too
+                    folderAdapter.updateFolders(DataHandler.getAllFolders().filter { it.userId == currentUserId })
                 }
             }
         )

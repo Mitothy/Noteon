@@ -6,14 +6,12 @@ import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class NoteDetailActivity : AppCompatActivity() {
-
     private lateinit var toolbar: Toolbar
     private lateinit var textViewTitle: TextView
     private lateinit var textViewContent: TextView
@@ -25,28 +23,21 @@ class NoteDetailActivity : AppCompatActivity() {
     private lateinit var formatButtons: List<MaterialButton>
     private var noteId: Long = -1
     private var isEditMode = false
+    private var currentNote: Note? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_note_detail)
 
-        setupToolbar()
         setupViews()
+        setupToolbar()
         setupBackPressHandler()
         loadNote()
     }
 
-    private fun setupToolbar() {
-        toolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(toolbar)
-        supportActionBar?.apply {
-            setDisplayHomeAsUpEnabled(true)
-            setHomeAsUpIndicator(R.drawable.ic_arrow_back)
-            title = getString(R.string.note_detail)
-        }
-    }
-
     private fun setupViews() {
+        // Initialize views
+        toolbar = findViewById(R.id.toolbar)
         textViewTitle = findViewById(R.id.textViewTitle)
         textViewContent = findViewById(R.id.textViewContent)
         editTextTitle = findViewById(R.id.editTextTitle)
@@ -55,16 +46,6 @@ class NoteDetailActivity : AppCompatActivity() {
         formattingToolbar = findViewById(R.id.formattingToolbar)
 
         textFormatter = TextFormatter(editTextContent)
-
-        formatButtons = listOf(
-            findViewById(R.id.buttonBold),
-            findViewById(R.id.buttonItalic),
-            findViewById(R.id.buttonStrike),
-            findViewById(R.id.buttonBullet),
-            findViewById(R.id.buttonQuote),
-            findViewById(R.id.buttonHeading)
-        )
-
         setupFormattingButtons()
 
         fabEdit.setOnClickListener {
@@ -76,7 +57,25 @@ class NoteDetailActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupToolbar() {
+        setSupportActionBar(toolbar)
+        supportActionBar?.apply {
+            setDisplayHomeAsUpEnabled(true)
+            setHomeAsUpIndicator(R.drawable.ic_arrow_back)
+            title = getString(R.string.note_detail)
+        }
+    }
+
     private fun setupFormattingButtons() {
+        formatButtons = listOf(
+            findViewById(R.id.buttonBold),
+            findViewById(R.id.buttonItalic),
+            findViewById(R.id.buttonStrike),
+            findViewById(R.id.buttonBullet),
+            findViewById(R.id.buttonQuote),
+            findViewById(R.id.buttonHeading)
+        )
+
         findViewById<MaterialButton>(R.id.buttonBold).setOnClickListener { textFormatter.toggleBold() }
         findViewById<MaterialButton>(R.id.buttonItalic).setOnClickListener { textFormatter.toggleItalic() }
         findViewById<MaterialButton>(R.id.buttonUnderline).setOnClickListener { textFormatter.toggleUnderline() }
@@ -103,12 +102,10 @@ class NoteDetailActivity : AppCompatActivity() {
     private fun loadNote() {
         noteId = intent.getLongExtra("NOTE_ID", -1)
         if (noteId != -1L) {
-            val note = DataHandler.getNoteById(noteId)
-            if (note != null) {
+            DataHandler.getNoteById(noteId)?.let { note ->
+                currentNote = note
                 displayNote(note)
-            } else {
-                finish()
-            }
+            } ?: finish()
         } else {
             finish()
         }
@@ -120,11 +117,15 @@ class NoteDetailActivity : AppCompatActivity() {
         editTextTitle.setText(note.title)
         editTextContent.setText(note.content)
         supportActionBar?.title = note.title
+
+        // Disable editing for notes in trash
+        fabEdit.visibility = if (note.isTrashed()) View.GONE else View.VISIBLE
     }
 
     private fun enableEditMode() {
-        isEditMode = true
+        if (currentNote?.isTrashed() == true) return
 
+        isEditMode = true
         textViewTitle.visibility = View.GONE
         textViewContent.visibility = View.GONE
         editTextTitle.visibility = View.VISIBLE
@@ -142,7 +143,6 @@ class NoteDetailActivity : AppCompatActivity() {
 
     private fun disableEditMode() {
         isEditMode = false
-
         textViewTitle.visibility = View.VISIBLE
         textViewContent.visibility = View.VISIBLE
         editTextTitle.visibility = View.GONE
@@ -157,6 +157,40 @@ class NoteDetailActivity : AppCompatActivity() {
         invalidateOptionsMenu()
     }
 
+    private fun saveChanges() {
+        val newTitle = editTextTitle.text.toString().trim()
+        val newContent = editTextContent.text.toString().trim()
+
+        if (newTitle.isEmpty()) {
+            editTextTitle.error = getString(R.string.title_required)
+            return
+        }
+
+        currentNote?.let { note ->
+            val updatedNote = note.copy(
+                title = newTitle,
+                content = newContent,
+                metadata = note.metadata.copy(
+                    syncStatus = SyncStatus.NotSynced
+                )
+            )
+            DataHandler.updateNote(updatedNote)
+            currentNote = updatedNote
+            displayNote(updatedNote)
+            disableEditMode()
+        }
+    }
+
+    private fun showDiscardChangesDialog() {
+        DialogUtils.showDiscardChangesDialog(
+            context = this,
+            onDiscard = {
+                disableEditMode()
+                currentNote?.let { displayNote(it) }
+            }
+        )
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
@@ -169,35 +203,5 @@ class NoteDetailActivity : AppCompatActivity() {
             }
             else -> super.onOptionsItemSelected(item)
         }
-    }
-
-    private fun saveChanges() {
-        val newTitle = editTextTitle.text.toString().trim()
-        val newContent = editTextContent.text.toString().trim()
-
-        if (newTitle.isEmpty()) {
-            editTextTitle.error = getString(R.string.title_required)
-            return
-        }
-
-        DataHandler.getNoteById(noteId)?.let { note ->
-            val updatedNote = note.copy(
-                title = newTitle,
-                content = newContent
-            )
-            DataHandler.updateNote(updatedNote)
-            displayNote(updatedNote)
-            disableEditMode()
-        }
-    }
-
-    private fun showDiscardChangesDialog() {
-        DialogUtils.showDiscardChangesDialog(
-            context = this,
-            onDiscard = {
-                disableEditMode()
-                DataHandler.getNoteById(noteId)?.let { displayNote(it) }
-            }
-        )
     }
 }

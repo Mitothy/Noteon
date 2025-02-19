@@ -96,7 +96,7 @@ class ChatbotActivity : AppCompatActivity() {
 
     private fun formatNotesContext(): String {
         val allNotes = DataHandler.getAllNotes()
-            .filter { !it.isDeleted }
+            .filter { !it.isTrashed() }
 
         return buildString {
             append("Here are all the user's notes for context:\n\n")
@@ -104,6 +104,13 @@ class ChatbotActivity : AppCompatActivity() {
                 append("Note ${index + 1}:\n")
                 append("Title: ${note.title}\n")
                 append("Content: ${note.content}\n")
+                append("State: ${
+                    when {
+                        note.isFavorite() -> "Favorite"
+                        note.isActive() -> "Active"
+                        else -> "Unknown"
+                    }
+                }\n")
                 if (index < allNotes.size - 1) {
                     append("\n---\n\n")
                 }
@@ -148,25 +155,25 @@ class ChatbotActivity : AppCompatActivity() {
                     if (noteId != -1L) {
                         val note = DataHandler.getNoteById(noteId)
                         note?.let {
-                            messages.add(ChatMessage("Note: ${note.title}", isUser = true, isNote = true))
-                            chatAdapter.updateMessages(messages)
-                            "Let's discuss this note. Title: ${note.title}. Content: ${note.content}"
+                            if (!note.isTrashed()) {
+                                messages.add(ChatMessage("Note: ${note.title}", isUser = true, isNote = true))
+                                chatAdapter.updateMessages(messages)
+                                "Let's discuss this note. Title: ${note.title}. Content: ${note.content}"
+                            } else null
                         }
-                    } else {
-                        null
-                    }
+                    } else null
                 }
                 ChatMode.SUMMARIZE -> {
                     if (noteId != -1L) {
                         val note = DataHandler.getNoteById(noteId)
                         note?.let {
-                            messages.add(ChatMessage("Summarize note: ${note.title}", isUser = true, isNote = true))
-                            chatAdapter.updateMessages(messages)
-                            "Please summarize this note. Title: ${note.title}. Content: ${note.content}"
+                            if (!note.isTrashed()) {
+                                messages.add(ChatMessage("Summarize note: ${note.title}", isUser = true, isNote = true))
+                                chatAdapter.updateMessages(messages)
+                                "Please summarize this note. Title: ${note.title}. Content: ${note.content}"
+                            } else null
                         }
-                    } else {
-                        null
-                    }
+                    } else null
                 }
                 ChatMode.GENERAL -> {
                     messages.add(ChatMessage("All notes passed to chatbot", isUser = true, isNote = true))

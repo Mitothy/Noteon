@@ -46,6 +46,7 @@
     <string name="delete_permanently_message">This note will be permanently deleted. This action cannot be undone.</string>
     <string name="move_to_trash">Move to Trash</string>
     <string name="title_required">Title is required</string>
+    <string name="content_required">Content is required</string>
     <string name="note_updated">Note updated</string>
     <string name="discard_changes">Discard Changes?</string>
     <string name="discard_changes_message">You have unsaved changes. Are you sure you want to discard them?</string>
@@ -133,4 +134,7 @@
     <string name="note_detail">Note Detail</string>
     <string name="folder_name_required">Folder name is required</string>
     <string name="confirm">Confirm</string>
+    <string name="sync_folder">Sync folder</string>
+    <string name="retry_sync">Retry sync</string>
+    <string name="syncing_folder">Syncing folder…</string>
 </resources>

@@ -83,11 +83,11 @@ class AuthManager private constructor(private val context: Context) {
         currentUser?.let { user ->
             try {
                 val notes = DataHandler.getAllNotes()
-                val totalNotes = notes.count { !it.isDeleted && it.userId == user.uid }
+                val totalNotes = notes.count { !it.isTrashed() && it.metadata.userId == user.uid }
                 var currentNote = 0
 
                 notes.forEach { note ->
-                    if (!note.isDeleted && note.userId == user.uid) {
+                    if (!note.isTrashed() && note.metadata.userId == user.uid) {
                         try {
                             val noteRef = database
                                 .child("users")
@@ -99,8 +99,8 @@ class AuthManager private constructor(private val context: Context) {
                                 "id" to note.id,
                                 "title" to note.title,
                                 "content" to note.content,
-                                "folderId" to note.folderId,
-                                "isFavorite" to note.isFavorite,
+                                "folderId" to note.metadata.folderId,
+                                "state" to NoteState.toDatabaseValue(note.state),
                                 "timestamp" to note.timestamp,
                                 "userId" to user.uid
                             )
@@ -138,7 +138,7 @@ class AuthManager private constructor(private val context: Context) {
                     .toSet()
 
                 val localNotes = DataHandler.getAllNotes()
-                    .filter { it.userId == user.uid && it.isSynced }
+                    .filter { it.metadata.userId == user.uid && it.isSynced }
 
                 localNotes.forEach { note ->
                     if (note.id !in serverNoteIds) {
@@ -150,21 +150,27 @@ class AuthManager private constructor(private val context: Context) {
                     try {
                         val noteMap = noteSnapshot.value as? Map<*, *>
                         if (noteMap != null) {
-                            val noteId = (noteMap["id"] as? Long)
-                            if (noteId == null) {
-                                return@forEach
-                            }
+                            val noteId = (noteMap["id"] as? Long) ?: return@forEach
+
+                            val state = NoteState.fromDatabaseValue(
+                                (noteMap["state"] as? Int) ?: 0,
+                                (noteMap["deletedDate"] as? Long)
+                            )
+
+                            val metadata = NoteMetadata(
+                                folderId = (noteMap["folderId"] as? Long) ?: 0L,
+                                userId = user.uid,
+                                syncStatus = SyncStatus.Synced
+                            )
 
                             val note = Note(
                                 id = noteId,
                                 title = (noteMap["title"] as? String) ?: "",
                                 content = (noteMap["content"] as? String) ?: "",
-                                folderId = (noteMap["folderId"] as? Long) ?: 0L,
-                                isFavorite = (noteMap["isFavorite"] as? Boolean) ?: false,
+                                state = state,
+                                metadata = metadata,
                                 timestamp = (noteMap["timestamp"] as? Long)
-                                    ?: System.currentTimeMillis(),
-                                userId = user.uid,
-                                isSynced = true
+                                    ?: System.currentTimeMillis()
                             )
 
                             if (note.title.isNotEmpty()) {
@@ -201,7 +207,15 @@ class AuthManager private constructor(private val context: Context) {
                         "name" to folder.name,
                         "description" to folder.description,
                         "timestamp" to folder.timestamp,
-                        "userId" to user.uid
+                        "userId" to user.uid,
+                        "metadata" to mapOf(
+                            "userId" to folder.metadata.userId,
+                            "syncStatus" to when (folder.metadata.syncStatus) {
+                                is SyncStatus.Synced -> 1
+                                is SyncStatus.SyncError -> 2
+                                else -> 0
+                            }
+                        )
                     )
 
                     userFoldersRef.child(folder.id.toString())
@@ -231,7 +245,6 @@ class AuthManager private constructor(private val context: Context) {
         }
     }
 
-
     suspend fun restoreFolders() {
         currentUser?.let { user ->
             try {
@@ -249,14 +262,24 @@ class AuthManager private constructor(private val context: Context) {
                     try {
                         val folderMap = folderSnapshot.value as? Map<*, *>
                         if (folderMap != null) {
+                            val metadataMap = folderMap["metadata"] as? Map<*, *>
+
+                            val metadata = FolderMetadata(
+                                userId = user.uid,
+                                syncStatus = when (metadataMap?.get("syncStatus") as? Int) {
+                                    1 -> SyncStatus.Synced
+                                    2 -> SyncStatus.SyncError("Unknown error")
+                                    else -> SyncStatus.NotSynced
+                                }
+                            )
+
                             val folder = Folder(
                                 id = (folderMap["id"] as? Long) ?: return@forEach,
                                 name = (folderMap["name"] as? String) ?: "",
                                 description = (folderMap["description"] as? String) ?: "",
                                 timestamp = (folderMap["timestamp"] as? Long)
                                     ?: System.currentTimeMillis(),
-                                userId = user.uid,
-                                isSynced = true
+                                metadata = metadata
                             )
 
                             if (folder.name.isNotEmpty()) {

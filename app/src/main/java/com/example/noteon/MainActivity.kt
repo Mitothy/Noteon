@@ -150,33 +150,10 @@ class MainActivity : BaseNavigationActivity() {
             onNoteClick = { note -> openNoteDetail(note.id) },
             onAIOptions = { note -> AIOptionsDialog(this).show(note) },
             onNoteOptions = { note ->
-                DialogUtils.showNoteOptionsDialog(
-                    context = this,
-                    note = note,
-                    isTrashView = currentView == ViewType.TRASH,
-                    onRestoreNote = {
-                        DataHandler.restoreNoteFromTrash(it.id)
-                        updateNotesList()
-                    },
-                    onDeletePermanently = {
-                        DataHandler.deleteNoteWithSync(it.id, this)
-                        updateNotesList()
-                    },
-                    onToggleFavorite = {
-                        DataHandler.toggleNoteFavorite(it.id)
-                        updateNotesList()
-                    },
-                    onMoveToFolder = {
-                        val intent = Intent(this, FolderActivity::class.java)
-                        intent.putExtra("NOTE_ID", note.id)
-                        startActivity(intent) },
-                    onMoveToTrash = {
-                        DataHandler.moveNoteToTrash(it.id)
-                        updateNotesList()
-                    }
-                )
-            },
-            isTrashView = currentView == ViewType.TRASH
+                NoteOptionsDialog(this, lifecycleScope).show(note) {
+                    updateNotesList()
+                }
+            }
         )
         recyclerViewNotes.layoutManager = LinearLayoutManager(this)
         recyclerViewNotes.adapter = notesAdapter
@@ -306,7 +283,14 @@ class MainActivity : BaseNavigationActivity() {
     }
 
     private fun filterNotes(query: String) {
-        val filteredNotes = notes.filter { note ->
+        val baseNotes = when (currentView) {
+            ViewType.ALL_NOTES -> DataHandler.getActiveNotes()
+            ViewType.FAVORITES -> DataHandler.getFavoriteNotes()
+            ViewType.FOLDER -> DataHandler.getNotesInFolder(currentFolderId)
+            ViewType.TRASH -> DataHandler.getTrashNotes()
+        }
+
+        val filteredNotes = baseNotes.filter { note ->
             note.title.contains(query, ignoreCase = true) ||
                     note.content.contains(query, ignoreCase = true)
         }
@@ -469,10 +453,10 @@ class MainActivity : BaseNavigationActivity() {
 
     private fun updateNotesList() {
         notes = when (currentView) {
-            ViewType.ALL_NOTES -> DataHandler.getAllNotes()
-            ViewType.FAVORITES -> DataHandler.getFavoriteNotes()
+            ViewType.ALL_NOTES -> DataHandler.getAllNotes().filter { it.isNormal() }
+            ViewType.FAVORITES -> DataHandler.getAllNotes().filter { it.isFavorite() }
             ViewType.FOLDER -> DataHandler.getNotesInFolder(currentFolderId)
-            ViewType.TRASH -> DataHandler.getTrashNotes()
+            ViewType.TRASH -> DataHandler.getAllNotes().filter { it.isTrashed() }
         }
         notesAdapter.updateNotes(notes)
     }

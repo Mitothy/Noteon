@@ -35,30 +35,17 @@ class TrashActivity : AppCompatActivity() {
         recyclerViewTrash = findViewById(R.id.recyclerViewTrash)
         trashAdapter = NotesAdapter(
             notes = emptyList(),
-            onNoteClick = { note -> showRestoreDialog(note) },
             coroutineScope = lifecycleScope,
-            onAIOptions = { note -> AIOptionsDialog(this).show(note) },
+            onNoteClick = { note -> showRestoreDialog(note) },
+            onAIOptions = { },  // AI options not available in trash
             onNoteOptions = { note ->
-                DialogUtils.showNoteOptionsDialog(
-                    context = this,
-                    note = note,
-                    isTrashView = true,
-                    onRestoreNote = {
-                        DataHandler.restoreNoteFromTrash(it.id)
-                        loadTrashNotes()
-                    },
-                    onDeletePermanently = {
-                        DataHandler.deleteNotePermanently(it.id)
-                        loadTrashNotes()
-                    }
-                )
-            },
-            isTrashView = true
+                NoteOptionsDialog(this, lifecycleScope).show(note) {
+                    loadTrashNotes()
+                }
+            }
         )
-        recyclerViewTrash.apply {
-            layoutManager = LinearLayoutManager(this@TrashActivity)
-            adapter = trashAdapter
-        }
+        recyclerViewTrash.layoutManager = LinearLayoutManager(this)
+        recyclerViewTrash.adapter = trashAdapter
     }
 
     private fun showRestoreDialog(note: Note) {
@@ -68,7 +55,8 @@ class TrashActivity : AppCompatActivity() {
             message = getString(R.string.restore_note_message),
             positiveButton = getString(R.string.restore),
             onConfirm = {
-                DataHandler.restoreNoteFromTrash(note.id)
+                val restoredNote = note.restore()
+                DataHandler.updateNote(restoredNote)
                 loadTrashNotes()
             }
         )
@@ -92,7 +80,7 @@ class TrashActivity : AppCompatActivity() {
     }
 
     private fun loadTrashNotes() {
-        val trashNotes = DataHandler.getTrashNotes()
+        val trashNotes = DataHandler.getAllNotes().filter { it.isTrashed() }
         trashAdapter.updateNotes(trashNotes)
     }
 }

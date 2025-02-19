@@ -14,8 +14,7 @@ class NotesAdapter(
     private val coroutineScope: CoroutineScope,
     private val onNoteClick: (Note) -> Unit,
     private val onAIOptions: (Note) -> Unit,
-    private val onNoteOptions: (Note) -> Unit,
-    private val isTrashView: Boolean = false
+    private val onNoteOptions: (Note) -> Unit
 ) : RecyclerView.Adapter<NotesAdapter.NoteViewHolder>() {
 
     inner class NoteViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -25,28 +24,30 @@ class NotesAdapter(
         private val buttonAIOptions: MaterialButton = itemView.findViewById(R.id.buttonAIOptions)
 
         fun bind(note: Note) {
+            // Title with favorite indicator if applicable
             textViewTitle.text = buildSpannedString {
                 append(note.title)
-                if (note.isFavorite && !isTrashView) {
+                if (note.isFavorite()) {
                     append(" ★")
                 }
             }
+
+            // Content preview with markdown
             MarkdownUtils.renderPreview(textViewContent, note.content)
 
+            // Setup click listeners
             itemView.setOnClickListener { onNoteClick(note) }
-            buttonOptions.setOnClickListener {
-                buttonOptions.setOnClickListener {
-                    onNoteOptions(note)
-                }
-            }
-            // Hide AI options in trash view
-            buttonAIOptions.visibility = if (isTrashView) View.GONE else View.VISIBLE
+            buttonOptions.setOnClickListener { onNoteOptions(note) }
+
+            // Show/hide AI options based on note state
+            buttonAIOptions.visibility = if (note.isTrashed()) View.GONE else View.VISIBLE
             buttonAIOptions.setOnClickListener { onAIOptions(note) }
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_note, parent, false)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_note, parent, false)
         return NoteViewHolder(view)
     }
 

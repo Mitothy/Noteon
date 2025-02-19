@@ -176,56 +176,88 @@ object DialogUtils {
         )
     }
 
+    private fun showMoveFolderDialog(
+        context: Context,
+        note: Note,
+        onMoveComplete: (Note) -> Unit
+    ) {
+        val folders = DataHandler.getAllFolders()
+            .filter { it.id != note.metadata.folderId }
+
+        val options = mutableListOf<String>()
+        val folderIds = mutableListOf<Long>()
+
+        // Add "Remove from folder" option if note is in a folder
+        if (note.metadata.folderId != 0L) {
+            options.add(context.getString(R.string.remove_from_folder))
+            folderIds.add(0L)
+        }
+
+        // Add all other folders
+        folders.forEach { folder ->
+            options.add(folder.name)
+            folderIds.add(folder.id)
+        }
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.move_to_folder)
+            .setItems(options.toTypedArray()) { _, which ->
+                val updatedNote = note.withFolder(folderIds[which])
+                DataHandler.updateNote(updatedNote)
+                onMoveComplete(updatedNote)
+            }
+            .show()
+    }
+
     fun showNoteOptionsDialog(
         context: Context,
         note: Note,
-        isTrashView: Boolean = false,
-        onRestoreNote: ((Note) -> Unit)? = null,
-        onDeletePermanently: ((Note) -> Unit)? = null,
-        onToggleFavorite: ((Note) -> Unit)? = null,
-        onMoveToFolder: ((Note) -> Unit)? = null,
-        onMoveToTrash: ((Note) -> Unit)? = null
+        onUpdateNote: ((Note) -> Unit)? = null
     ) {
-        if (isTrashView) {
-            showOptionsDialog(
-                context = context,
-                title = context.getString(R.string.note_options),
-                options = arrayOf(
-                    context.getString(R.string.restore),
-                    context.getString(R.string.delete_permanently)
-                ),
-                onOptionSelected = { which ->
-                    when (which) {
-                        0 -> onRestoreNote?.invoke(note)
-                        1 -> showDeleteConfirmationDialog(
-                            context = context,
-                            message = context.getString(R.string.delete_permanently_message),
-                            onConfirm = { onDeletePermanently?.invoke(note) }
-                        )
+        val options = note.state.getAvailableOptions()
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.note_options)
+            .setItems(
+                options.map { context.getString(it.getResourceString()) }.toTypedArray()
+            ) { _, which ->
+                when (val selectedOption = options[which]) {
+                    is NoteOption.ToggleFavorite -> {
+                        val updatedNote = if (selectedOption.currentlyFavorited) {
+                            note.unfavorite()
+                        } else {
+                            note.favorite()
+                        }
+                        DataHandler.updateNote(updatedNote)
+                        onUpdateNote?.invoke(updatedNote)
+                    }
+                    is NoteOption.MoveToFolder -> {
+                        showMoveFolderDialog(context, note) { updatedNote ->
+                            onUpdateNote?.invoke(updatedNote)
+                        }
+                    }
+                    is NoteOption.MoveToTrash -> {
+                        val trashedNote = note.moveToTrash()
+                        DataHandler.updateNote(trashedNote)
+                        onUpdateNote?.invoke(trashedNote)
+                    }
+                    is NoteOption.Restore -> {
+                        val restoredNote = note.restore()
+                        DataHandler.updateNote(restoredNote)
+                        onUpdateNote?.invoke(restoredNote)
+                    }
+                    is NoteOption.DeletePermanently -> {
+                        showDeletePermanentlyDialog(context, note) {
+                            DataHandler.deleteNoteWithSync(note.id, context)
+                            onUpdateNote?.invoke(note)
+                        }
+                    }
+                    is NoteOption.AIOptions -> {
+                        AIOptionsDialog(context).show(note)
                     }
                 }
-            )
-        } else {
-            showOptionsDialog(
-                context = context,
-                title = context.getString(R.string.note_options),
-                options = arrayOf(
-                    context.getString(
-                        if (note.isFavorite) R.string.remove_from_favorites
-                        else R.string.add_to_favorites
-                    ),
-                    context.getString(R.string.move_to_folder),
-                    context.getString(R.string.move_to_trash)
-                ),
-                onOptionSelected = { which ->
-                    when (which) {
-                        0 -> onToggleFavorite?.invoke(note)
-                        1 -> onMoveToFolder?.invoke(note)
-                        2 -> onMoveToTrash?.invoke(note)
-                    }
-                }
-            )
-        }
+            }
+            .show()
     }
 
     fun showDeleteFolderConfirmationDialog(
@@ -238,6 +270,19 @@ object DialogUtils {
             message = context.getString(R.string.delete_folder_confirmation),
             onConfirm = onConfirm
         )
+    }
+
+    private fun showDeletePermanentlyDialog(
+        context: Context,
+        note: Note,
+        onConfirm: () -> Unit
+    ) {
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.delete_permanently)
+            .setMessage(R.string.delete_permanently_message)
+            .setPositiveButton(R.string.delete) { _, _ -> onConfirm() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     fun showDiscardChangesDialog(
@@ -257,13 +302,12 @@ object DialogUtils {
         context: Context,
         onConfirm: () -> Unit
     ) {
-        showConfirmationDialog(
-            context = context,
-            title = context.getString(R.string.empty_trash),
-            message = context.getString(R.string.empty_trash_message),
-            positiveButton = context.getString(R.string.empty_trash),
-            onConfirm = onConfirm
-        )
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.empty_trash)
+            .setMessage(R.string.empty_trash_message)
+            .setPositiveButton(R.string.empty_trash) { _, _ -> onConfirm() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     fun showExitGuestModeDialog(

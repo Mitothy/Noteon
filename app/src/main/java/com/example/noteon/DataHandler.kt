@@ -168,7 +168,9 @@ object DataHandler {
             authManager.currentUser?.uid
         }
 
+        // Only return folders that explicitly match the current user's ID
         return dbHelper.getFoldersByUser(currentUserId ?: "")
+            .filter { it.userId == currentUserId }
     }
 
     fun getAllFolders(): List<Folder> = dbHelper.getAllFolders()
@@ -195,8 +197,16 @@ object DataHandler {
 
     fun moveNoteToFolder(noteId: Long, folderId: Long) {
         getNoteById(noteId)?.let { note ->
+            // Verify folder exists if we're moving to a folder
+            if (folderId != 0L && getFolderById(folderId) == null) {
+                return
+            }
+
             val updatedNote = note.copy(
-                metadata = note.metadata.copy(folderId = folderId)
+                metadata = note.metadata.copy(
+                    folderId = folderId,
+                    syncStatus = SyncStatus.NotSynced
+                )
             )
             dbHelper.updateNote(updatedNote)
         }
@@ -205,6 +215,17 @@ object DataHandler {
     fun searchFolders(query: String): List<Folder> = dbHelper.searchFolders(query)
 
     fun addFolderFromSync(folder: Folder): Folder {
+        // First check if folder exists
+        val existingFolder = getFolderById(folder.id)
+
+        // If folder exists, update it instead of recreating
+        if (existingFolder != null) {
+            val updatedFolder = folder.withSyncStatus(SyncStatus.Synced)
+            dbHelper.updateFolder(updatedFolder)
+            return updatedFolder
+        }
+
+        // If folder doesn't exist, create it
         val syncedFolder = folder.withSyncStatus(SyncStatus.Synced)
         val id = dbHelper.upsertSyncedFolder(syncedFolder)
         return syncedFolder.copy(id = id)
@@ -298,13 +319,5 @@ object DataHandler {
         } else {
             deleteFolder(folderId)
         }
-    }
-
-    fun clearSyncedFolders(userId: String) {
-        getAllFolders()
-            .filter { it.metadata.userId == userId && it.isSynced }
-            .forEach { folder ->
-                deleteFolder(folder.id)
-            }
     }
 }

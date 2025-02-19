@@ -48,8 +48,11 @@ class AuthManager private constructor(private val context: Context) {
                 // Then restore folders to ensure proper hierarchy
                 restoreFolders()
 
-                // Finally restore notes
+                // Finally restore notes with folder relationships preserved
                 restoreNotes()
+
+                // Clean up any orphaned folders (folders without valid user ID)
+                cleanupOrphanedData(user.uid)
 
                 Log.d(TAG, "All data restored successfully")
             } catch (e: Exception) {
@@ -248,8 +251,9 @@ class AuthManager private constructor(private val context: Context) {
     suspend fun restoreFolders() {
         currentUser?.let { user ->
             try {
-                // Clear existing synced folders
-                DataHandler.clearSyncedFolders(user.uid)
+                // Instead of clearing folders first, get current folders
+                val currentFolders = DataHandler.getFoldersByUser(context)
+                val currentFolderIds = currentFolders.map { it.id }.toSet()
 
                 val foldersSnapshot = database
                     .child("users")
@@ -258,6 +262,19 @@ class AuthManager private constructor(private val context: Context) {
                     .get()
                     .await()
 
+                // Get server folder IDs
+                val serverFolderIds = foldersSnapshot.children
+                    .mapNotNull { (it.value as? Map<*, *>)?.get("id") as? Long }
+                    .toSet()
+
+                // Remove folders that don't exist on server
+                currentFolders.forEach { folder ->
+                    if (folder.id !in serverFolderIds) {
+                        DataHandler.deleteFolder(folder.id)
+                    }
+                }
+
+                // Restore/update folders from server
                 foldersSnapshot.children.forEach { folderSnapshot ->
                     try {
                         val folderMap = folderSnapshot.value as? Map<*, *>
@@ -294,6 +311,40 @@ class AuthManager private constructor(private val context: Context) {
                 Log.e(TAG, "Error restoring folders", e)
                 throw e
             }
+        }
+    }
+
+    private suspend fun cleanupOrphanedData(userId: String) {
+        try {
+            // Get all folders
+            val folders = DataHandler.getAllFolders()
+
+            // Remove folders that don't belong to the current user
+            folders.forEach { folder ->
+                if (folder.userId != userId) {
+                    DataHandler.deleteFolder(folder.id)
+                }
+            }
+
+            // Get all notes
+            val notes = DataHandler.getAllNotes()
+
+            // Remove folder associations for notes that reference non-existent folders
+            val validFolderIds = DataHandler.getAllFolders().map { it.id }.toSet()
+            notes.forEach { note ->
+                if (note.metadata.folderId != 0L && note.metadata.folderId !in validFolderIds) {
+                    val updatedNote = note.copy(
+                        metadata = note.metadata.copy(
+                            folderId = 0L,
+                            syncStatus = SyncStatus.NotSynced
+                        )
+                    )
+                    DataHandler.updateNote(updatedNote)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cleaning up orphaned data", e)
+            throw e
         }
     }
 }

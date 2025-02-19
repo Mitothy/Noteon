@@ -19,7 +19,6 @@ class FolderAdapter(
         private val textViewNoteCount: TextView = itemView.findViewById(R.id.textViewNoteCount)
         private val buttonEdit: ImageButton = itemView.findViewById(R.id.buttonFolderEdit)
         private val buttonDelete: ImageButton = itemView.findViewById(R.id.buttonFolderDelete)
-        private val syncIndicator: View = itemView.findViewById(R.id.syncIndicator)
 
         fun bind(folder: Folder) {
             textViewFolderName.text = folder.name
@@ -41,20 +40,6 @@ class FolderAdapter(
                         updateFolders(folders.filter { it.id != folder.id })
                     }
                 )
-            }
-
-            // Update sync indicator based on sync status
-            syncIndicator.visibility = when (folder.metadata.syncStatus) {
-                is SyncStatus.NotSynced -> View.VISIBLE
-                is SyncStatus.SyncError -> View.VISIBLE
-                is SyncStatus.Synced -> View.GONE
-            }
-
-            // Set different indicator color for sync error
-            if (folder.metadata.syncStatus is SyncStatus.SyncError) {
-                syncIndicator.setBackgroundResource(R.drawable.sync_error_indicator)
-            } else {
-                syncIndicator.setBackgroundResource(R.drawable.sync_pending_indicator)
             }
         }
     }

@@ -105,7 +105,8 @@ class AuthManager private constructor(private val context: Context) {
                                 "folderId" to note.metadata.folderId,
                                 "state" to NoteState.toDatabaseValue(note.state),
                                 "timestamp" to note.timestamp,
-                                "userId" to user.uid
+                                "userId" to user.uid,
+                                "isFavorite" to note.isFavorite()
                             )
 
                             noteRef.setValue(noteMap).await()
@@ -155,10 +156,15 @@ class AuthManager private constructor(private val context: Context) {
                         if (noteMap != null) {
                             val noteId = (noteMap["id"] as? Long) ?: return@forEach
 
-                            val state = NoteState.fromDatabaseValue(
-                                (noteMap["state"] as? Int) ?: 0,
-                                (noteMap["deletedDate"] as? Long)
-                            )
+                            // Determine the correct state
+                            val stateValue = (noteMap["state"] as? Int) ?: 0
+                            val isFavorite = (noteMap["isFavorite"] as? Boolean) ?: false
+
+                            val state = when {
+                                stateValue == 2 -> NoteState.Trash((noteMap["deletedDate"] as? Long) ?: System.currentTimeMillis())
+                                isFavorite -> NoteState.Favorite
+                                else -> NoteState.Active
+                            }
 
                             val metadata = NoteMetadata(
                                 folderId = (noteMap["folderId"] as? Long) ?: 0L,

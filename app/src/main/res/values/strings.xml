@@ -137,4 +137,5 @@
     <string name="sync_folder">Sync folder</string>
     <string name="retry_sync">Retry sync</string>
     <string name="syncing_folder">Syncing folder…</string>
+    <string name="no_results_found">No results found</string>
 </resources>

@@ -16,7 +16,10 @@ import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -32,16 +35,15 @@ class MainActivity : BaseNavigationActivity() {
     private lateinit var fabAddNote: FloatingActionButton
     private lateinit var fabChatbot: FloatingActionButton
     private lateinit var searchView: SearchView
-    private var isSearching = false
-    private lateinit var searchHelperText: TextView
-    private lateinit var searchLoadingIndicator: ProgressBar
+    private lateinit var searchViewModel: SearchViewModel
+    private lateinit var searchStateHelper: TextView
+    private lateinit var searchProgressBar: ProgressBar
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var intelligentSearchService: IntelligentSearchService
     private lateinit var notesAdapter: NotesAdapter
     private lateinit var notes: List<Note>
     private var currentFolderId: Long = 0
     private var currentView = ViewType.ALL_NOTES
-    private lateinit var authManager: AuthManager
     private lateinit var guestSession: GuestSession
 
     override val currentNavigationItem: Int
@@ -88,6 +90,8 @@ class MainActivity : BaseNavigationActivity() {
         setupRecyclerView()
         setupFab()
         setupSearchView()
+        setupSearchViewModel()
+        observeSearchState()
         setupNavigationFooter()
     }
 
@@ -167,15 +171,84 @@ class MainActivity : BaseNavigationActivity() {
         }
     }
 
+    private fun setupSearchViewModel() {
+        val factory = SearchViewModel.Factory(
+            preferencesManager = preferencesManager,
+            intelligentSearchService = intelligentSearchService
+        )
+        searchViewModel = ViewModelProvider(this, factory)[SearchViewModel::class.java]
+    }
+
+    private fun observeSearchState() {
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                searchViewModel.searchState.collect { state ->
+                    handleSearchState(state)
+                }
+            }
+        }
+    }
+
+    private fun handleSearchState(state: SearchState) {
+        when (state) {
+            is SearchState.Idle -> {
+                searchStateHelper.visibility = View.GONE
+                searchProgressBar.visibility = View.GONE
+                notesAdapter.updateNotes(notes)
+            }
+
+            is SearchState.Filtering -> {
+                searchProgressBar.visibility = View.GONE
+            }
+
+            is SearchState.IntelligentSearching -> {
+                searchStateHelper.apply {
+                    text = getString(R.string.intelligent_search_progress)
+                    visibility = View.VISIBLE
+                }
+                searchProgressBar.visibility = View.VISIBLE
+            }
+
+            is SearchState.Error -> {
+                searchStateHelper.apply {
+                    text = state.message
+                    visibility = View.VISIBLE
+                }
+                searchProgressBar.visibility = View.GONE
+                Toast.makeText(this, state.message, Toast.LENGTH_SHORT).show()
+            }
+
+            is SearchState.Results -> {
+                if (!preferencesManager.isIntelligentSearchEnabled()) {
+                    searchProgressBar.visibility = View.GONE
+                } else {
+                    // Hide all indicators when intelligent search completes
+                    searchStateHelper.visibility = View.GONE
+                    searchProgressBar.visibility = View.GONE
+                }
+                notesAdapter.updateNotes(state.notes)
+            }
+
+            is SearchState.Empty -> {
+                searchStateHelper.apply {
+                    text = getString(R.string.no_results_found)
+                    visibility = View.VISIBLE
+                }
+                searchProgressBar.visibility = View.GONE
+                notesAdapter.updateNotes(emptyList())
+            }
+        }
+    }
+
     private fun setupSearchView() {
-        searchHelperText = TextView(this).apply {
+        searchStateHelper = TextView(this).apply {
             id = View.generateViewId()
             setTextAppearance(android.R.style.TextAppearance_Small)
             alpha = 0.7f
             visibility = View.GONE
         }
 
-        searchLoadingIndicator = ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
+        searchProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleSmall).apply {
             id = View.generateViewId()
             visibility = View.GONE
         }
@@ -184,7 +257,6 @@ class MainActivity : BaseNavigationActivity() {
         val searchContainer = searchView.parent as ViewGroup
         val searchIndex = searchContainer.indexOfChild(searchView)
 
-        // Layout for loading indicator and helper text
         val horizontalLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -195,13 +267,13 @@ class MainActivity : BaseNavigationActivity() {
                 setMargins(16, 4, 16, 16)
             }
 
-            addView(searchLoadingIndicator, LinearLayout.LayoutParams(
+            addView(searchProgressBar, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 marginEnd = 8
             })
-            addView(searchHelperText, LinearLayout.LayoutParams(
+            addView(searchStateHelper, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ))
@@ -211,87 +283,40 @@ class MainActivity : BaseNavigationActivity() {
 
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                if (!query.isNullOrBlank()) {
-                    performSearch(query)
+                if (!query.isNullOrBlank() && preferencesManager.isIntelligentSearchEnabled()) {
+                    // Only perform intelligent search on submit
+                    searchViewModel.search(query, currentView, currentFolderId, isIntelligentSearch = true)
                 }
                 return true
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 if (newText.isNullOrBlank()) {
-                    notesAdapter.updateNotes(notes)
-                    updateSearchHelperText(false)
+                    searchViewModel.cancelSearch()
+                    searchStateHelper.visibility = View.GONE
                     return true
                 }
 
+                // Only perform basic filtering while typing
+                searchViewModel.search(newText, currentView, currentFolderId, isIntelligentSearch = false)
+
+                // Show "Press Enter" message if intelligent search is enabled
                 if (preferencesManager.isIntelligentSearchEnabled()) {
-                    updateSearchHelperText(true)
-                    filterNotes(newText)
-                } else {
-                    updateSearchHelperText(false)
-                    filterNotes(newText)
+                    searchStateHelper.apply {
+                        text = getString(R.string.press_enter_for_intelligent_search)
+                        visibility = View.VISIBLE
+                    }
                 }
+
                 return true
             }
         })
-    }
 
-    private fun updateSearchHelperText(showIntelligentSearch: Boolean) {
-        if (showIntelligentSearch) {
-            searchHelperText.apply {
-                text = getString(R.string.press_enter_for_intelligent_search)
-                visibility = View.VISIBLE
-            }
-        } else {
-            searchHelperText.visibility = View.GONE
+        searchView.setOnCloseListener {
+            searchViewModel.cancelSearch()
+            searchStateHelper.visibility = View.GONE
+            false
         }
-    }
-
-    private fun performSearch(query: String) {
-        if (!preferencesManager.isIntelligentSearchEnabled()) {
-            filterNotes(query)
-            return
-        }
-
-        isSearching = true
-        searchLoadingIndicator.visibility = View.VISIBLE
-        searchHelperText.apply {
-            text = getString(R.string.intelligent_search_progress)
-            visibility = View.VISIBLE
-        }
-
-        lifecycleScope.launch {
-            try {
-                val searchResults = intelligentSearchService.searchNotes(query, notes)
-                notesAdapter.updateNotes(searchResults)
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@MainActivity,
-                    R.string.search_error,
-                    Toast.LENGTH_SHORT
-                ).show()
-                filterNotes(query)
-            } finally {
-                searchLoadingIndicator.visibility = View.GONE
-                searchHelperText.visibility = View.GONE
-                isSearching = false
-            }
-        }
-    }
-
-    private fun filterNotes(query: String) {
-        val baseNotes = when (currentView) {
-            ViewType.ALL_NOTES -> DataHandler.getActiveNotes()
-            ViewType.FAVORITES -> DataHandler.getFavoriteNotes()
-            ViewType.FOLDER -> DataHandler.getNotesInFolder(currentFolderId)
-            ViewType.TRASH -> DataHandler.getTrashNotes()
-        }
-
-        val filteredNotes = baseNotes.filter { note ->
-            note.title.contains(query, ignoreCase = true) ||
-                    note.content.contains(query, ignoreCase = true)
-        }
-        notesAdapter.updateNotes(filteredNotes)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

@@ -34,7 +34,6 @@ class FolderAdapter(
             buttonDelete.setOnClickListener {
                 DialogUtils.showDeleteFolderConfirmationDialog(
                     context = itemView.context,
-                    folder = folder,
                     onConfirm = {
                         DataHandler.deleteFolderWithSync(folder.id, itemView.context)
                         updateFolders(folders.filter { it.id != folder.id })

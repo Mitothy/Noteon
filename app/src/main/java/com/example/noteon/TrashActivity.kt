@@ -2,7 +2,6 @@ package com.example.noteon
 
 import android.os.Bundle
 import android.widget.Button
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -35,7 +34,6 @@ class TrashActivity : AppCompatActivity() {
         recyclerViewTrash = findViewById(R.id.recyclerViewTrash)
         trashAdapter = NotesAdapter(
             notes = emptyList(),
-            coroutineScope = lifecycleScope,
             onNoteClick = { note -> showRestoreDialog(note) },
             onAIOptions = { },  // AI options not available in trash
             onNoteOptions = { note ->

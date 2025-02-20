@@ -90,14 +90,6 @@ object DataHandler {
         dbHelper.updateNote(updatedNote)
     }
 
-    fun toggleNoteFavorite(noteId: Long) {
-        getNoteById(noteId)?.let { note ->
-            val newState = if (note.isFavorite()) NoteState.Active else NoteState.Favorite
-            val updatedNote = note.withState(newState)
-            dbHelper.updateNote(updatedNote)
-        }
-    }
-
     fun getActiveNotes(): List<Note> = dbHelper.getActiveNotes()
 
     fun getFavoriteNotes(): List<Note> = dbHelper.getFavoriteNotes()

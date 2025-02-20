@@ -28,17 +28,6 @@ class AuthManager private constructor(private val context: Context) {
         }
     }
 
-    fun signOut() {
-        // Clear settings before signing out
-        PreferencesManager.getInstance(context).clearSettings()
-
-        // Clear data for current user before signing out
-        currentUser?.let { user ->
-            DataHandler.clearUserData(user.uid)
-        }
-        auth.signOut()
-    }
-
     suspend fun restoreData() {
         currentUser?.let { user ->
             try {
@@ -57,26 +46,6 @@ class AuthManager private constructor(private val context: Context) {
                 Log.d(TAG, "All data restored successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Error during data restoration", e)
-                throw e
-            }
-        }
-    }
-
-    suspend fun backupData(onProgress: (current: Int, total: Int) -> Unit = { _, _ -> }) {
-        currentUser?.let { user ->
-            try {
-                // First backup settings
-                PreferencesManager.getInstance(context).syncSettingsToFirebase(user.uid)
-
-                // Then backup folders
-                backupFolders()
-
-                // Finally backup notes with progress
-                backupNotes(onProgress)
-
-                Log.d(TAG, "All data backed up successfully")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during data backup", e)
                 throw e
             }
         }
@@ -259,7 +228,7 @@ class AuthManager private constructor(private val context: Context) {
             try {
                 // Instead of clearing folders first, get current folders
                 val currentFolders = DataHandler.getFoldersByUser(context)
-                val currentFolderIds = currentFolders.map { it.id }.toSet()
+                currentFolders.map { it.id }.toSet()
 
                 val foldersSnapshot = database
                     .child("users")
@@ -320,7 +289,7 @@ class AuthManager private constructor(private val context: Context) {
         }
     }
 
-    private suspend fun cleanupOrphanedData(userId: String) {
+    private fun cleanupOrphanedData(userId: String) {
         try {
             // Get all folders
             val folders = DataHandler.getAllFolders()

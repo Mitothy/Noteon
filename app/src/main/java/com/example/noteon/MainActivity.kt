@@ -1,6 +1,5 @@
 package com.example.noteon
 
-import android.app.Dialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -14,7 +13,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.drawerlayout.widget.DrawerLayout
@@ -146,7 +144,6 @@ class MainActivity : BaseNavigationActivity() {
     private fun setupRecyclerView() {
         notesAdapter = NotesAdapter(
             notes = notes,
-            coroutineScope = lifecycleScope,
             onNoteClick = { note -> openNoteDetail(note.id) },
             onAIOptions = { note -> AIOptionsDialog(this).show(note) },
             onNoteOptions = { note ->
@@ -367,31 +364,6 @@ class MainActivity : BaseNavigationActivity() {
         }
     }
 
-    private fun signOut() {
-        if (guestSession.isGuestSession()) {
-            // Show confirmation dialog for guest mode exit
-            AlertDialog.Builder(this)
-                .setTitle(R.string.exit_guest_mode)
-                .setMessage(R.string.exit_guest_mode_message)
-                .setPositiveButton(R.string.exit) { _, _ ->
-                    guestSession.clearGuestData(this)
-                    startActivity(Intent(this, LoginActivity::class.java))
-                    finish()
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
-        } else if (authManager.currentUser != null) {
-            // Regular sign out for authenticated users
-            authManager.signOut()
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-        } else {
-            // If neither guest nor authenticated, go to login
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-        }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -468,40 +440,6 @@ class MainActivity : BaseNavigationActivity() {
             ViewType.FOLDER -> DataHandler.getFolderById(currentFolderId)?.name
                 ?: getString(R.string.all_notes)
             ViewType.TRASH -> getString(R.string.trash)
-        }
-    }
-
-    private fun updateNavigationHeader() {
-        val navigationView = findViewById<NavigationView>(R.id.navigationView)
-        val headerView = navigationView.getHeaderView(0)
-        val footerContainer = navigationView.findViewById<View>(R.id.nav_footer_container)
-        val usernameTextView = headerView.findViewById<TextView>(R.id.nav_header_username)
-        val emailTextView = headerView.findViewById<TextView>(R.id.nav_header_email)
-
-        when {
-            authManager.currentUser != null -> {
-                // User is logged in - existing logic
-                footerContainer?.visibility = View.GONE
-                val userName = DataHandler.getUserName(authManager.currentUser!!.uid)
-                if (userName != null) {
-                    usernameTextView?.text = userName
-                } else {
-                    usernameTextView?.text = authManager.currentUser!!.email?.substringBefore('@')?.capitalize()
-                }
-                emailTextView?.text = authManager.currentUser!!.email
-            }
-            GuestSession.getInstance(this).isGuestSession() -> {
-                // User is in guest mode
-                footerContainer?.visibility = View.VISIBLE
-                usernameTextView?.text = getString(R.string.app_name)
-                emailTextView?.text = getString(R.string.guest_user)
-            }
-            else -> {
-                // Not logged in and not in guest mode
-                footerContainer?.visibility = View.VISIBLE
-                usernameTextView?.text = getString(R.string.app_name)
-                emailTextView?.text = getString(R.string.guest_user)
-            }
         }
     }
 }

@@ -134,135 +134,8 @@ object DialogUtils {
         )
     }
 
-    fun showOptionsDialog(
-        context: Context,
-        title: String,
-        options: Array<String>,
-        onOptionSelected: (Int) -> Unit
-    ) {
-        MaterialAlertDialogBuilder(context)
-            .setTitle(title)
-            .setItems(options) { _, which ->
-                onOptionSelected(which)
-            }
-            .show()
-    }
-
-    fun showFolderOptionsDialog(
-        context: Context,
-        folder: Folder,
-        onEditFolder: (Folder) -> Unit,
-        onDeleteFolder: (Folder) -> Unit
-    ) {
-        showOptionsDialog(
-            context = context,
-            title = context.getString(R.string.folder_options),
-            options = context.resources.getStringArray(R.array.folder_options),
-            onOptionSelected = { which ->
-                when (which) {
-                    0 -> showCreateFolderDialog(
-                        context = context,
-                        existingFolder = folder
-                    ) { name, description ->
-                        onEditFolder(folder.copy(name = name, description = description))
-                    }
-                    1 -> showDeleteFolderConfirmationDialog(
-                        context = context,
-                        folder = folder,
-                        onConfirm = { onDeleteFolder(folder) }
-                    )
-                }
-            }
-        )
-    }
-
-    private fun showMoveFolderDialog(
-        context: Context,
-        note: Note,
-        onMoveComplete: (Note) -> Unit
-    ) {
-        val folders = DataHandler.getAllFolders()
-            .filter { it.id != note.metadata.folderId }
-
-        val options = mutableListOf<String>()
-        val folderIds = mutableListOf<Long>()
-
-        // Add "Remove from folder" option if note is in a folder
-        if (note.metadata.folderId != 0L) {
-            options.add(context.getString(R.string.remove_from_folder))
-            folderIds.add(0L)
-        }
-
-        // Add all other folders
-        folders.forEach { folder ->
-            options.add(folder.name)
-            folderIds.add(folder.id)
-        }
-
-        MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.move_to_folder)
-            .setItems(options.toTypedArray()) { _, which ->
-                val updatedNote = note.withFolder(folderIds[which])
-                DataHandler.updateNote(updatedNote)
-                onMoveComplete(updatedNote)
-            }
-            .show()
-    }
-
-    fun showNoteOptionsDialog(
-        context: Context,
-        note: Note,
-        onUpdateNote: ((Note) -> Unit)? = null
-    ) {
-        val options = note.state.getAvailableOptions()
-
-        MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.note_options)
-            .setItems(
-                options.map { context.getString(it.getResourceString()) }.toTypedArray()
-            ) { _, which ->
-                when (val selectedOption = options[which]) {
-                    is NoteOption.ToggleFavorite -> {
-                        val updatedNote = if (selectedOption.currentlyFavorited) {
-                            note.unfavorite()
-                        } else {
-                            note.favorite()
-                        }
-                        DataHandler.updateNote(updatedNote)
-                        onUpdateNote?.invoke(updatedNote)
-                    }
-                    is NoteOption.MoveToFolder -> {
-                        showMoveFolderDialog(context, note) { updatedNote ->
-                            onUpdateNote?.invoke(updatedNote)
-                        }
-                    }
-                    is NoteOption.MoveToTrash -> {
-                        val trashedNote = note.moveToTrash()
-                        DataHandler.updateNote(trashedNote)
-                        onUpdateNote?.invoke(trashedNote)
-                    }
-                    is NoteOption.Restore -> {
-                        val restoredNote = note.restore()
-                        DataHandler.updateNote(restoredNote)
-                        onUpdateNote?.invoke(restoredNote)
-                    }
-                    is NoteOption.DeletePermanently -> {
-                        showDeletePermanentlyDialog(context, note) {
-                            DataHandler.deleteNoteWithSync(note.id, context)
-                            onUpdateNote?.invoke(note)
-                        }
-                    }
-                    is NoteOption.AIOptions -> {
-                        AIOptionsDialog(context).show(note)
-                    }
-                }
-            }
-            .show()
-    }
-
     fun showDeleteFolderConfirmationDialog(
         context: Context,
-        folder: Folder,
         onConfirm: () -> Unit
     ) {
         showDeleteConfirmationDialog(
@@ -270,19 +143,6 @@ object DialogUtils {
             message = context.getString(R.string.delete_folder_confirmation),
             onConfirm = onConfirm
         )
-    }
-
-    private fun showDeletePermanentlyDialog(
-        context: Context,
-        note: Note,
-        onConfirm: () -> Unit
-    ) {
-        MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.delete_permanently)
-            .setMessage(R.string.delete_permanently_message)
-            .setPositiveButton(R.string.delete) { _, _ -> onConfirm() }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     fun showDiscardChangesDialog(

@@ -37,20 +37,6 @@ class LoginActivity : BaseActivity() {
         setupClickListeners()
     }
 
-    private fun checkCurrentState() {
-        when (val state = authStateManager.getCurrentState()) {
-            is AuthState.Authenticated -> {
-                startMainActivity()
-            }
-            is AuthState.Guest -> {
-                startMainActivity()
-            }
-            is AuthState.Unauthenticated -> {
-                // Stay on login screen
-            }
-        }
-    }
-
     private fun setupViews() {
         editTextEmail = findViewById(R.id.editTextEmail)
         editTextPassword = findViewById(R.id.editTextPassword)

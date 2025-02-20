@@ -25,15 +25,6 @@ data class Note(
     fun unfavorite() = withState(NoteState.Active)
     fun moveToTrash() = withState(NoteState.Trash())
     fun restore() = withState(NoteState.Active)
-
-    // Metadata update methods
-    fun withFolder(newFolderId: Long) = copy(
-        metadata = metadata.copy(folderId = newFolderId)
-    )
-
-    fun withSyncStatus(newStatus: SyncStatus) = copy(
-        metadata = metadata.copy(syncStatus = newStatus)
-    )
 }
 
 sealed class NoteState {
@@ -116,6 +107,4 @@ sealed class SyncStatus {
     object Synced : SyncStatus()
     object NotSynced : SyncStatus()
     data class SyncError(val error: String) : SyncStatus()
-
-    fun isSynced() = this is Synced
 }

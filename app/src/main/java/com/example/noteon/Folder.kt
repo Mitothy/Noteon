@@ -9,15 +9,10 @@ data class Folder(
 ) {
     // Convenience getters for metadata properties
     val userId: String? get() = metadata.userId
-    val isSynced: Boolean get() = metadata.syncStatus is SyncStatus.Synced
 
     // Helper methods for updating metadata
     fun withSyncStatus(newStatus: SyncStatus) = copy(
         metadata = metadata.copy(syncStatus = newStatus)
-    )
-
-    fun withUserId(newUserId: String?) = copy(
-        metadata = metadata.copy(userId = newUserId)
     )
 }
 

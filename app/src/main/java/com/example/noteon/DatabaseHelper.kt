@@ -294,30 +294,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         return notes
     }
 
-    fun getNotesInFolderWithState(folderId: Long, state: NoteState): List<Note> {
-        val notes = mutableListOf<Note>()
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_NOTES,
-            null,
-            "$KEY_FOLDER_ID = ? AND $KEY_STATE = ?",
-            arrayOf(
-                folderId.toString(),
-                NoteState.toDatabaseValue(state).toString()
-            ),
-            null, null,
-            "$KEY_TIMESTAMP DESC"
-        )
-
-        if (cursor.moveToFirst()) {
-            do {
-                notes.add(createNoteFromCursor(cursor))
-            } while (cursor.moveToNext())
-        }
-        cursor.close()
-        return notes
-    }
-
     // Folder CRUD Operations
     fun addFolder(folder: Folder): Long {
         val db = this.writableDatabase
@@ -440,40 +416,6 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             arrayOf("%$query%", "%$query%"),
             null, null,
             "$KEY_NAME ASC"
-        )
-
-        if (cursor.moveToFirst()) {
-            do {
-                folders.add(createFolderFromCursor(cursor))
-            } while (cursor.moveToNext())
-        }
-        cursor.close()
-        return folders
-    }
-
-    fun updateFolderSyncStatus(folderId: Long, status: SyncStatus): Int {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put(KEY_SYNC_STATUS, getSyncStatusValue(status))
-        }
-        return db.update(TABLE_FOLDERS, values, "$KEY_ID = ?", arrayOf(folderId.toString()))
-    }
-
-    fun getSyncedFolders(): List<Folder> = getFoldersBySyncStatus(SyncStatus.Synced)
-
-    fun getUnsyncedFolders(): List<Folder> = getFoldersBySyncStatus(SyncStatus.NotSynced)
-
-    private fun getFoldersBySyncStatus(status: SyncStatus): List<Folder> {
-        val folders = mutableListOf<Folder>()
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_FOLDERS,
-            null,
-            "$KEY_SYNC_STATUS = ?",
-            arrayOf(getSyncStatusValue(status).toString()),
-            null,
-            null,
-            "$KEY_TIMESTAMP DESC"
         )
 
         if (cursor.moveToFirst()) {

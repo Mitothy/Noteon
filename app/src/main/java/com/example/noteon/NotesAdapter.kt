@@ -7,11 +7,9 @@ import android.widget.TextView
 import androidx.core.text.buildSpannedString
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
-import kotlinx.coroutines.CoroutineScope
 
 class NotesAdapter(
     private var notes: List<Note>,
-    private val coroutineScope: CoroutineScope,
     private val onNoteClick: (Note) -> Unit,
     private val onAIOptions: (Note) -> Unit,
     private val onNoteOptions: (Note) -> Unit

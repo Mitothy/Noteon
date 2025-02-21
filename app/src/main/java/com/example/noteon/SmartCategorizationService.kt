@@ -3,9 +3,20 @@ package com.example.noteon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SmartCategorizationService {
+class SmartCategorizationService private constructor() {
     private val openAIService = OpenAIService.create()
     private var currentThreadId: String? = null
+
+    companion object {
+        @Volatile
+        private var instance: SmartCategorizationService? = null
+
+        fun getInstance(): SmartCategorizationService {
+            return instance ?: synchronized(this) {
+                instance ?: SmartCategorizationService().also { instance = it }
+            }
+        }
+    }
 
     suspend fun getSortedFolders(note: Note, folders: List<Folder>): List<Folder> = withContext(Dispatchers.IO) {
         try {
@@ -43,18 +54,15 @@ class SmartCategorizationService {
             val messagesResponse = openAIService.getMessages(currentThreadId!!, order = "desc", limit = 1)
             val response = messagesResponse.data.firstOrNull()?.content?.firstOrNull()?.text?.value ?: ""
 
-            // Parse the response and sort folders
+            // Parse the response and maintain order in a List
             val folderIds = response.split(",")
                 .mapNotNull { it.trim().toLongOrNull() }
-                .toSet()
 
             // Sort folders based on the AI response
-            val sortedFolders = folders.sortedWith(compareBy { folder ->
+            folders.sortedWith(compareBy { folder ->
                 val index = folderIds.indexOf(folder.id)
                 if (index == -1) Int.MAX_VALUE else index
             })
-
-            sortedFolders
         } catch (e: Exception) {
             folders
         }

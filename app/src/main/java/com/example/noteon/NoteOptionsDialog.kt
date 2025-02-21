@@ -95,9 +95,10 @@ class NoteOptionsDialog(
                     folderIds.add(0L)
                 }
 
+                // Get sorted folders if smart categorization is enabled
                 val sortedFolders = if (isSmartCategorizationEnabled) {
                     withContext(Dispatchers.IO) {
-                        SmartCategorizationService().getSortedFolders(note, folders)
+                        SmartCategorizationService.getInstance().getSortedFolders(note, folders)
                     }
                 } else {
                     folders

@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 sealed class SearchState {
-    object Idle : SearchState()
+    data object Idle : SearchState()
     data class Filtering(val query: String) : SearchState()
     data class IntelligentSearching(val query: String) : SearchState()
     data class Error(val message: String) : SearchState()
@@ -13,10 +13,8 @@ sealed class SearchState {
     data class Empty(val query: String) : SearchState()
 }
 
-class SearchManager(
-    private val preferencesManager: PreferencesManager,
-    private val intelligentSearchService: IntelligentSearchService
-) {
+class SearchManager(private val preferencesManager: PreferencesManager) {
+    private val intelligentSearchService = IntelligentSearchService.getInstance()
     private val _searchState = MutableStateFlow<SearchState>(SearchState.Idle)
     val searchState: StateFlow<SearchState> = _searchState.asStateFlow()
 
@@ -27,9 +25,7 @@ class SearchManager(
         isIntelligentSearch: Boolean = false
     ) {
         if (query.isBlank()) {
-            getInitialNotes(viewType, folderId).let { notes ->
-                updateState(SearchState.Results(notes, query))
-            }
+            updateState(SearchState.Results(getInitialNotes(viewType, folderId), query))
             return
         }
 

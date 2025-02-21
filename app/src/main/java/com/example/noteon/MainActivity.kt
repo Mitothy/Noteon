@@ -16,7 +16,6 @@ import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.drawerlayout.widget.DrawerLayout
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -35,11 +34,10 @@ class MainActivity : BaseNavigationActivity() {
     private lateinit var fabAddNote: FloatingActionButton
     private lateinit var fabChatbot: FloatingActionButton
     private lateinit var searchView: SearchView
-    private lateinit var searchViewModel: SearchViewModel
+    private lateinit var searchManager: SearchManager
     private lateinit var searchStateHelper: TextView
     private lateinit var searchProgressBar: ProgressBar
     private lateinit var preferencesManager: PreferencesManager
-    private lateinit var intelligentSearchService: IntelligentSearchService
     private lateinit var notesAdapter: NotesAdapter
     private lateinit var notes: List<Note>
     private var currentFolderId: Long = 0
@@ -81,7 +79,7 @@ class MainActivity : BaseNavigationActivity() {
         authStateManager = AuthStateManager.getInstance(this)
         guestSession = GuestSession.getInstance(this)
         preferencesManager = PreferencesManager.getInstance(this)
-        intelligentSearchService = IntelligentSearchService()
+        searchManager = SearchManager(preferencesManager)
 
         setupViews()
         setupToolbar()
@@ -90,11 +88,9 @@ class MainActivity : BaseNavigationActivity() {
         setupRecyclerView()
         setupFab()
         setupSearchView()
-        setupSearchViewModel()
         observeSearchState()
         setupNavigationFooter()
     }
-
 
     private fun setupViews() {
         drawerLayout = findViewById(R.id.drawerLayout)
@@ -171,18 +167,10 @@ class MainActivity : BaseNavigationActivity() {
         }
     }
 
-    private fun setupSearchViewModel() {
-        val factory = SearchViewModel.Factory(
-            preferencesManager = preferencesManager,
-            intelligentSearchService = intelligentSearchService
-        )
-        searchViewModel = ViewModelProvider(this, factory)[SearchViewModel::class.java]
-    }
-
     private fun observeSearchState() {
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                searchViewModel.searchState.collect { state ->
+                searchManager.searchState.collect { state ->
                     handleSearchState(state)
                 }
             }
@@ -284,23 +272,24 @@ class MainActivity : BaseNavigationActivity() {
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 if (!query.isNullOrBlank() && preferencesManager.isIntelligentSearchEnabled()) {
-                    // Only perform intelligent search on submit
-                    searchViewModel.search(query, currentView, currentFolderId, isIntelligentSearch = true)
+                    lifecycleScope.launch {
+                        searchManager.performSearch(query, currentView, currentFolderId, true)
+                    }
                 }
                 return true
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 if (newText.isNullOrBlank()) {
-                    searchViewModel.cancelSearch()
+                    searchManager.cancelSearch()
                     searchStateHelper.visibility = View.GONE
                     return true
                 }
 
-                // Only perform basic filtering while typing
-                searchViewModel.search(newText, currentView, currentFolderId, isIntelligentSearch = false)
+                lifecycleScope.launch {
+                    searchManager.performSearch(newText, currentView, currentFolderId, false)
+                }
 
-                // Show "Press Enter" message if intelligent search is enabled
                 if (preferencesManager.isIntelligentSearchEnabled()) {
                     searchStateHelper.apply {
                         text = getString(R.string.press_enter_for_intelligent_search)
@@ -313,7 +302,7 @@ class MainActivity : BaseNavigationActivity() {
         })
 
         searchView.setOnCloseListener {
-            searchViewModel.cancelSearch()
+            searchManager.cancelSearch()
             searchStateHelper.visibility = View.GONE
             false
         }

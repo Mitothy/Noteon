@@ -3,9 +3,20 @@ package com.example.noteon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class IntelligentSearchService {
+class IntelligentSearchService private constructor() {
     private val openAIService = OpenAIService.create()
     private var currentThreadId: String? = null
+
+    companion object {
+        @Volatile
+        private var instance: IntelligentSearchService? = null
+
+        fun getInstance(): IntelligentSearchService {
+            return instance ?: synchronized(this) {
+                instance ?: IntelligentSearchService().also { instance = it }
+            }
+        }
+    }
 
     suspend fun searchNotes(query: String, notes: List<Note>): List<Note> = withContext(Dispatchers.IO) {
         try {
